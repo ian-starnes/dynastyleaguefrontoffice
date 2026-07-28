@@ -16,3 +16,12 @@ export function getSleeperLeagueId(): string {
 
   return leagueId;
 }
+
+/**
+ * The Sleeper user_id that is "you" — used only for the "My Team" filter.
+ * Optional: returns null (filter simply matches nothing) if unset, rather
+ * than throwing, since nothing else depends on it.
+ */
+export function getMyOwnerId(): string | null {
+  return process.env.NEXT_PUBLIC_SLEEPER_MY_OWNER_ID ?? null;
+}

@@ -1,10 +1,11 @@
-import { getLeaguePlayers } from "@/lib/sleeper";
+import { getLeaguePlayers } from "@/lib/league-players";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PlayersExplorer } from "@/components/players/PlayersExplorer";
 
-// Server Component: all Sleeper access happens through lib/sleeper here —
-// never directly inside a UI component.
+// Server Component: all Sleeper access happens through lib/sleeper (and the
+// lib/league-players join on top of it) — never directly inside a UI
+// component.
 export default async function PlayersPage() {
   try {
     const players = await getLeaguePlayers();

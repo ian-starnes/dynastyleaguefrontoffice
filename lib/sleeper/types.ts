@@ -47,15 +47,3 @@ export type NFLPlayer = {
   position: string;
   nflTeam: string;
 };
-
-/**
- * An NFL player in the context of one specific league. Wraps the immutable
- * NFLPlayer with league-specific state. Only `currentOwnerName` exists
- * today — acquisition cost, keeper cost, contract years remaining,
- * franchise value contribution, keeper surplus, and trade value will all
- * attach here as those features get built.
- */
-export type LeaguePlayer = {
-  nflPlayer: NFLPlayer;
-  currentOwnerName: string | null;
-};

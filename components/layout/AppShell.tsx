@@ -1,10 +1,13 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
+import { TableStateProvider } from "@/components/ui/DataTable";
 
 /**
  * Top-level page frame: fixed sidebar on the left, scrollable content on the
  * right. Every route is rendered as `children` here via app/layout.tsx, so
- * the nav and chrome never re-mount between page transitions.
+ * the nav and chrome — and TableStateProvider below — never re-mount
+ * between page transitions, which is what lets a DataTable's sort/filter
+ * state survive navigating away and back.
  */
 export function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -12,7 +15,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <Sidebar />
       <main className="min-w-0 flex-1 lg:pl-72">
         <div className="mx-auto max-w-5xl px-6 py-10 sm:px-10 lg:px-16 lg:py-16">
-          {children}
+          <TableStateProvider>{children}</TableStateProvider>
         </div>
       </main>
     </div>
