@@ -25,7 +25,7 @@ type PlayersTableState = {
 };
 
 const DEFAULT_STATE: PlayersTableState = {
-  sort: { columnId: "fantasyValue", direction: "desc" },
+  sort: { columnId: "fantasyCalc", direction: "desc" },
   filterId: "all",
   search: "",
 };

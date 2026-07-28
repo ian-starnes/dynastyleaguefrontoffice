@@ -40,4 +40,18 @@ export const PLAYER_COLUMNS: Column<LeaguePlayer>[] = [
     sortValue: (row) => row.fantasyValue,
     render: (row) => row.fantasyValue.toFixed(1),
   },
+  {
+    id: "fantasyCalc",
+    header: "FantasyCalc",
+    sortable: true,
+    // Unmatched players sort to the bottom of the default (descending)
+    // view; -Infinity is only for ordering, never shown.
+    sortValue: (row) => row.fantasyCalcValue ?? Number.NEGATIVE_INFINITY,
+    render: (row) =>
+      row.fantasyCalcValue !== null ? (
+        row.fantasyCalcValue.toLocaleString()
+      ) : (
+        <span className="text-ink/30">—</span>
+      ),
+  },
 ];
