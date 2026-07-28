@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/**
+ * Design tokens for DLFO. These map directly to the palette in the brief and
+ * generate Tailwind utilities automatically (bg-primary, text-gold, etc.)
+ * via Tailwind v4's CSS-first `@theme` config — no tailwind.config.js needed.
+ */
+@theme {
+  --color-background: #f7f6f2;
+  --color-primary: #123524;
+  --color-gold: #c6a664;
+  --color-ink: #1c1c1c;
+}
+
+/* Bridge next/font CSS variables (set on <html>) into Tailwind font utilities. */
+@theme inline {
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-ink);
+  }
+}
