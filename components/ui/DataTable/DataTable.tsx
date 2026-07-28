@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
+import { Fragment, memo, useMemo } from "react";
 import type { Column, SortState } from "./types";
 import { nextSortState, sortRows } from "./sort";
 
@@ -13,13 +13,42 @@ type DataTableProps<T> = {
   emptyMessage?: string;
 };
 
+type RowProps<T> = {
+  row: T;
+  columns: Column<T>[];
+};
+
+/**
+ * Its own memoized component so re-sorting (which reorders `rows` but
+ * doesn't change any individual row's data) or an unrelated parent
+ * re-render doesn't re-invoke every row's render logic — only rows whose
+ * `row` or `columns` reference actually changed re-render.
+ */
+function DataTableRowInner<T>({ row, columns }: RowProps<T>) {
+  return (
+    <tr className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]">
+      {columns.map((column) => (
+        <td
+          key={column.id}
+          className={`px-5 py-3 text-ink/70 ${column.cellClassName ?? ""}`}
+        >
+          {column.render(row)}
+        </td>
+      ))}
+    </tr>
+  );
+}
+// memo() erases the generic signature; cast it back so callers still see
+// DataTableRow<T> rather than a component locked to one inferred type.
+const DataTableRow = memo(DataTableRowInner) as typeof DataTableRowInner;
+
 /**
  * Generic, presentation-only table: sorting, header interaction, and the
  * mobile "Sort by" select all derive from the `columns` config passed in.
  * A new column (Keeper Cost, Contract Years, Franchise Value, ...) is just
  * a new entry in that config — nothing in here needs to change.
  */
-export function DataTable<T>({
+function DataTableInner<T>({
   columns,
   rows,
   rowKey,
@@ -67,6 +96,8 @@ export function DataTable<T>({
         </select>
       </div>
 
+      {/* Sticky header: the header row pins to the top of this scroll
+          container while the body scrolls beneath it. */}
       <div className="max-h-[65vh] overflow-auto">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
@@ -106,19 +137,7 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {sortedRows.map((row) => (
-              <tr
-                key={rowKey(row)}
-                className="border-b border-black/5 last:border-0 hover:bg-black/[0.02]"
-              >
-                {columns.map((column) => (
-                  <td
-                    key={column.id}
-                    className={`px-5 py-3 text-ink/70 ${column.cellClassName ?? ""}`}
-                  >
-                    {column.render(row)}
-                  </td>
-                ))}
-              </tr>
+              <DataTableRow key={rowKey(row)} row={row} columns={columns} />
             ))}
 
             {sortedRows.length === 0 ? (
@@ -137,3 +156,6 @@ export function DataTable<T>({
     </div>
   );
 }
+
+// Same erased-generic-signature workaround as DataTableRow above.
+export const DataTable = memo(DataTableInner) as typeof DataTableInner;

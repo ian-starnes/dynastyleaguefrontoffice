@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Card } from "@/components/ui/Card";
 import { ChipGroup } from "@/components/ui/ChipGroup";
 import {
@@ -10,10 +10,12 @@ import {
 } from "@/components/ui/DataTable";
 import { getMyOwnerId } from "@/lib/sleeper";
 import type { LeaguePlayer } from "@/lib/league-players";
-import { PLAYER_COLUMNS } from "./playerColumns";
+import { createPlayerColumns } from "./playerColumns";
 import {
   PLAYER_FILTERS,
   matchesPlayerFilter,
+  ownerFilterId,
+  ownerIdFromFilter,
   type PlayerFilterId,
 } from "./playerFilters";
 import { PlayerSearchInput } from "./PlayerSearchInput";
@@ -30,6 +32,11 @@ const DEFAULT_STATE: PlayersTableState = {
   search: "",
 };
 
+// Stable module-level reference — no need to recreate this every render.
+function getPlayerRowKey(row: LeaguePlayer): string {
+  return row.nflPlayer.id;
+}
+
 /**
  * Owns the sort/filter/search state for the players table — persisted via
  * useTableState so it survives navigating to another page and back.
@@ -42,6 +49,40 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
     DEFAULT_STATE
   );
   const myOwnerId = getMyOwnerId();
+
+  const setFilterId = useCallback(
+    (filterId: PlayerFilterId) =>
+      setTableState((prev) => ({ ...prev, filterId })),
+    [setTableState]
+  );
+
+  const setSearch = useCallback(
+    (search: string) => setTableState((prev) => ({ ...prev, search })),
+    [setTableState]
+  );
+
+  const handleSortChange = useCallback(
+    (sort: SortState) => setTableState((prev) => ({ ...prev, sort })),
+    [setTableState]
+  );
+
+  // Clicking the currently-filtered owner again clears back to "All".
+  const handleOwnerClick = useCallback(
+    (ownerId: string) =>
+      setTableState((prev) => ({
+        ...prev,
+        filterId:
+          ownerIdFromFilter(prev.filterId) === ownerId
+            ? "all"
+            : ownerFilterId(ownerId),
+      })),
+    [setTableState]
+  );
+
+  const columns = useMemo(
+    () => createPlayerColumns({ onOwnerClick: handleOwnerClick }),
+    [handleOwnerClick]
+  );
 
   const filteredPlayers = useMemo(() => {
     const query = tableState.search.trim().toLowerCase();
@@ -64,27 +105,45 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
     });
   }, [players, tableState.filterId, tableState.search, myOwnerId]);
 
+  const activeOwnerId = ownerIdFromFilter(tableState.filterId);
+  const activeOwnerName = useMemo(() => {
+    if (!activeOwnerId) return null;
+    return (
+      players.find((player) => player.currentOwnerId === activeOwnerId)
+        ?.currentOwnerName ?? null
+    );
+  }, [players, activeOwnerId]);
+
   return (
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <ChipGroup
-          chips={PLAYER_FILTERS}
-          activeId={tableState.filterId}
-          onChange={(filterId) => setTableState({ ...tableState, filterId })}
-        />
-        <PlayerSearchInput
-          value={tableState.search}
-          onChange={(search) => setTableState({ ...tableState, search })}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ChipGroup
+            chips={PLAYER_FILTERS}
+            activeId={tableState.filterId}
+            onChange={setFilterId}
+          />
+          {activeOwnerName ? (
+            <button
+              type="button"
+              onClick={() => setFilterId("all")}
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-background"
+            >
+              {activeOwnerName}
+              <span aria-hidden>×</span>
+            </button>
+          ) : null}
+        </div>
+        <PlayerSearchInput value={tableState.search} onChange={setSearch} />
       </div>
 
       <Card className="mt-4">
         <DataTable
-          columns={PLAYER_COLUMNS}
+          columns={columns}
           rows={filteredPlayers}
-          rowKey={(row) => row.nflPlayer.id}
+          rowKey={getPlayerRowKey}
           sort={tableState.sort}
-          onSortChange={(sort) => setTableState({ ...tableState, sort })}
+          onSortChange={handleSortChange}
           emptyMessage="No players match your filters."
         />
       </Card>

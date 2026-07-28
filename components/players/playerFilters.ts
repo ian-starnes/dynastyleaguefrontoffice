@@ -1,5 +1,7 @@
 import type { LeaguePlayer } from "@/lib/league-players";
 
+const OWNER_FILTER_PREFIX = "owner:";
+
 export type PlayerFilterId =
   | "all"
   | "QB"
@@ -8,7 +10,8 @@ export type PlayerFilterId =
   | "TE"
   | "owned"
   | "free-agent"
-  | "my-team";
+  | "my-team"
+  | `${typeof OWNER_FILTER_PREFIX}${string}`;
 
 export const PLAYER_FILTERS: { id: PlayerFilterId; label: string }[] = [
   { id: "all", label: "All" },
@@ -21,11 +24,26 @@ export const PLAYER_FILTERS: { id: PlayerFilterId; label: string }[] = [
   { id: "my-team", label: "My Team" },
 ];
 
+export function ownerFilterId(ownerId: string): PlayerFilterId {
+  return `${OWNER_FILTER_PREFIX}${ownerId}`;
+}
+
+export function ownerIdFromFilter(filterId: PlayerFilterId): string | null {
+  return filterId.startsWith(OWNER_FILTER_PREFIX)
+    ? filterId.slice(OWNER_FILTER_PREFIX.length)
+    : null;
+}
+
 export function matchesPlayerFilter(
   player: LeaguePlayer,
   filterId: PlayerFilterId,
   myOwnerId: string | null
 ): boolean {
+  const clickedOwnerId = ownerIdFromFilter(filterId);
+  if (clickedOwnerId !== null) {
+    return player.currentOwnerId === clickedOwnerId;
+  }
+
   switch (filterId) {
     case "all":
       return true;
@@ -40,5 +58,7 @@ export function matchesPlayerFilter(
       return player.currentOwnerId === null;
     case "my-team":
       return myOwnerId !== null && player.currentOwnerId === myOwnerId;
+    default:
+      return false;
   }
 }
