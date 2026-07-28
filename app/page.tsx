@@ -1,5 +1,15 @@
 import { Button } from "@/components/ui/Button";
 
+// Pillars the platform will eventually surface real data for. Labels only —
+// no football logic or data lives in the shell yet.
+const PLATFORM_PILLARS = [
+  "Franchise Value",
+  "Keeper Surplus",
+  "Auction Budget",
+  "Contract Timeline",
+  "League Intelligence",
+];
+
 /**
  * The "Front Office" landing view — pure marketing/orientation content, no
  * football functionality. Vertically centered hero within the shell's main
@@ -18,6 +28,19 @@ export default function HomePage() {
         &ldquo;The operating system for keeper and dynasty fantasy
         football.&rdquo;
       </p>
+
+      <ul className="mt-10 flex max-w-2xl flex-wrap items-center gap-x-4 gap-y-2 border-t border-gold/30 pt-6">
+        {PLATFORM_PILLARS.map((pillar, index) => (
+          <li key={pillar} className="flex items-center gap-4">
+            {index > 0 ? (
+              <span aria-hidden className="h-1 w-1 rounded-full bg-gold" />
+            ) : null}
+            <span className="text-xs font-medium uppercase tracking-[0.12em] text-primary/70">
+              {pillar}
+            </span>
+          </li>
+        ))}
+      </ul>
 
       <div className="mt-10 flex flex-wrap items-center gap-4">
         <Button variant="primary" href="/league">

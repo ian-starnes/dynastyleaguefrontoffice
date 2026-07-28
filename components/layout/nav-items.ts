@@ -1,15 +1,26 @@
+import {
+  Landmark,
+  Trophy,
+  Users,
+  User,
+  ArrowLeftRight,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
+
 export type NavItem = {
   label: string;
   href: string;
+  icon: LucideIcon;
 };
 
 // Single source of truth for the left navigation. Add a route here and it
 // appears in the sidebar automatically.
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Front Office", href: "/" },
-  { label: "League", href: "/league" },
-  { label: "Teams", href: "/teams" },
-  { label: "Players", href: "/players" },
-  { label: "Trades", href: "/trades" },
-  { label: "Settings", href: "/settings" },
+  { label: "Front Office", href: "/", icon: Landmark },
+  { label: "League", href: "/league", icon: Trophy },
+  { label: "Teams", href: "/teams", icon: Users },
+  { label: "Players", href: "/players", icon: User },
+  { label: "Trades", href: "/trades", icon: ArrowLeftRight },
+  { label: "Settings", href: "/settings", icon: Settings },
 ];
