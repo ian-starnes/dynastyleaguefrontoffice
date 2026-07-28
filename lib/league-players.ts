@@ -16,6 +16,8 @@ export type LeaguePlayer = {
   currentOwnerName: string | null;
   /** Real dynasty market value from FantasyCalc; null if unmatched — never faked. */
   fantasyCalcValue: number | null;
+  /** Real 30-day value change from FantasyCalc; null if unmatched. */
+  fantasyCalcTrend30Day: number | null;
   /**
    * Real Expert Consensus Ranking from FantasyPros; always null today — no
    * licensed API key exists yet. See lib/services/fantasypros.ts for why,
@@ -90,7 +92,21 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
         ? ownerNameByUserId.get(ownerId) ?? null
         : null,
       fantasyCalcValue: fantasyCalcMatch?.value ?? null,
+      fantasyCalcTrend30Day: fantasyCalcMatch?.trend30Day ?? null,
       fantasyProsECR: fantasyProsMatch?.ecr ?? null,
     };
   });
+}
+
+/**
+ * Single-player lookup for the profile page. Thin wrapper around
+ * getLeaguePlayers() rather than a separate fetch path — Next's fetch
+ * cache already dedupes the underlying Sleeper/FantasyCalc requests, so
+ * this isn't a wasted refetch of ~1000 players just to show one.
+ */
+export async function getLeaguePlayer(
+  playerId: string
+): Promise<LeaguePlayer | null> {
+  const players = await getLeaguePlayers();
+  return players.find((player) => player.nflPlayer.id === playerId) ?? null;
 }

@@ -16,6 +16,7 @@ type FantasyCalcApiEntry = {
     maybeTeam?: string | null;
   };
   value: number;
+  trend30Day: number;
 };
 
 export type FantasyCalcPlayer = {
@@ -25,6 +26,8 @@ export type FantasyCalcPlayer = {
   position: string;
   team: string | null;
   value: number;
+  /** Real 30-day value change from FantasyCalc — not a full history, just the trend. */
+  trend30Day: number;
 };
 
 /**
@@ -82,6 +85,7 @@ export async function getFantasyCalcValues(): Promise<
       position: entry.player.position,
       team: entry.player.maybeTeam ?? null,
       value: entry.value,
+      trend30Day: entry.trend30Day,
     };
 
     if (player.sleeperId) {

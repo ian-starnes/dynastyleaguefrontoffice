@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Column } from "@/components/ui/DataTable";
 import type { LeaguePlayer } from "@/lib/league-players";
 import { PlayerHeadshot } from "./PlayerHeadshot";
@@ -23,15 +24,18 @@ export function createPlayerColumns({
       sortable: true,
       sortValue: (row) => row.nflPlayer.fullName,
       render: (row) => (
-        <div className="flex items-center gap-3">
+        <Link
+          href={`/players/${row.nflPlayer.id}`}
+          className="group flex items-center gap-3"
+        >
           <PlayerHeadshot
             playerId={row.nflPlayer.id}
             name={row.nflPlayer.fullName}
           />
-          <span className="font-medium text-ink">
+          <span className="font-medium text-ink group-hover:text-primary group-hover:underline">
             {row.nflPlayer.fullName}
           </span>
-        </div>
+        </Link>
       ),
     },
     {

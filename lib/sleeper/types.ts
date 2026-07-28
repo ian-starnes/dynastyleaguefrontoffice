@@ -37,6 +37,29 @@ export type SleeperRawPlayer = {
 // than an array.
 export type SleeperPlayersMap = Record<string, SleeperRawPlayer>;
 
+export type SleeperTransaction = {
+  transaction_id: string;
+  type: string; // "trade" | "free_agent" | "waiver"
+  status: string;
+  created: number; // epoch ms
+  roster_ids: number[];
+  adds: Record<string, number> | null; // player_id -> roster_id
+  drops: Record<string, number> | null; // player_id -> roster_id
+};
+
+export type SleeperDraft = {
+  draft_id: string;
+  season: string;
+};
+
+export type SleeperDraftPick = {
+  round: number;
+  pick_no: number;
+  player_id: string;
+  picked_by: string; // user_id; empty string if traded to a roster with no direct pick owner
+  roster_id: number;
+};
+
 /**
  * Immutable NFL reference data, independent of any league. Who owns this
  * player in a fantasy league never changes what it is.
