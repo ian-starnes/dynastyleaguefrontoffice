@@ -2,13 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { NavItem } from "./nav-items";
+import type { ReactNode } from "react";
+
+type NavLinkProps = {
+  label: string;
+  href: string;
+  /**
+   * Pre-rendered icon element, not the icon component itself — a component
+   * reference is a function and can't cross the server/client boundary as a
+   * prop, but an already-rendered element can.
+   */
+  icon: ReactNode;
+};
 
 /**
  * A single sidebar entry. Reads the current route via `usePathname` so the
  * active item can carry the "subtle green highlight" called for in the brief.
  */
-export function NavLink({ label, href, icon: Icon }: NavItem) {
+export function NavLink({ label, href, icon }: NavLinkProps) {
   const pathname = usePathname();
   const isActive = href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -22,7 +33,7 @@ export function NavLink({ label, href, icon: Icon }: NavItem) {
           : "text-ink/60 hover:bg-black/[0.03] hover:text-ink"
       }`}
     >
-      <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+      {icon}
       {label}
     </Link>
   );

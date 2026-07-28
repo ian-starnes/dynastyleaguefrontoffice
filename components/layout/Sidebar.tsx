@@ -25,8 +25,13 @@ export function Sidebar() {
         </Link>
 
         <nav className="mt-8 flex flex-1 flex-col gap-1 lg:mt-12">
-          {NAV_ITEMS.map((item) => (
-            <NavLink key={item.href} {...item} />
+          {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+            <NavLink
+              key={href}
+              href={href}
+              label={label}
+              icon={<Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} />}
+            />
           ))}
         </nav>
       </div>
