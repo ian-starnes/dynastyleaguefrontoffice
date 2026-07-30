@@ -2,7 +2,7 @@ import type { Column } from "@/components/ui/DataTable";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { LeaguePlayer } from "@/lib/league-players";
 import { PlayerHeadshot } from "./PlayerHeadshot";
-import { formatCompactValue } from "./format";
+import { formatDollarValue } from "./format";
 
 type AssetColumnsOptions = {
   onOwnerClick: (ownerId: string) => void;
@@ -21,14 +21,14 @@ function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
       <p className="font-semibold uppercase tracking-wide text-gold">
         Asset Value
       </p>
-      <p>{formatCompactValue(player.marketValue)} Market Value</p>
+      <p>{formatDollarValue(player.marketValue)} Market Value</p>
       <p>
         {surplusSign}
-        {formatCompactValue(player.keeperSurplus)} Keeper Surplus
+        {formatDollarValue(player.keeperSurplus)} Keeper Surplus
       </p>
       <div className="my-1 border-t border-background/20" />
       <p className="font-semibold">
-        {formatCompactValue(player.assetValue!)} Asset Value
+        {formatDollarValue(player.assetValue!)} Asset Value
       </p>
     </div>
   );
@@ -40,6 +40,11 @@ function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
  * instead of navigating away. Called from AssetsExplorer via useMemo,
  * keyed on the (also memoized) callbacks, so the returned array stays
  * referentially stable across re-renders.
+ *
+ * Deliberately no "FantasyCalc" column here — it's hidden by default per
+ * the valuation pivot (it's an input to Market Value now, not the value
+ * itself). The field still lives on LeaguePlayer (row.fantasyCalc) for
+ * anyone who needs it later; this is just where it's excluded from view.
  */
 export function createAssetColumns({
   onOwnerClick,
@@ -105,11 +110,12 @@ export function createAssetColumns({
       sortable: true,
       // "How good is the player?" — a restrained blue, distinct from the
       // contract (green/red) and franchise (gold) figures next to it.
+      // Estimated auction dollars, not FantasyCalc points.
       sortValue: (row) => row.marketValue ?? Number.NEGATIVE_INFINITY,
       render: (row) =>
         row.marketValue !== null ? (
           <span className="text-blue-800">
-            {formatCompactValue(row.marketValue)}
+            {formatDollarValue(row.marketValue)}
           </span>
         ) : (
           <span className="text-ink/30">—</span>
@@ -120,7 +126,7 @@ export function createAssetColumns({
       header: "Keeper Cost",
       sortable: true,
       sortValue: (row) => row.keeperCost,
-      render: (row) => formatCompactValue(row.keeperCost),
+      render: (row) => formatDollarValue(row.keeperCost),
     },
     {
       id: "keeperSurplus",
@@ -135,18 +141,18 @@ export function createAssetColumns({
             className={row.keeperSurplus >= 0 ? "text-primary" : "text-red-700"}
           >
             {row.keeperSurplus >= 0 ? "+" : ""}
-            {formatCompactValue(row.keeperSurplus)}
+            {formatDollarValue(row.keeperSurplus)}
           </span>
         ) : (
           <span className="text-ink/30">—</span>
         ),
     },
     {
-      id: "yearsRemaining",
+      id: "keeperYearsRemaining",
       header: "Years Remaining",
       sortable: true,
-      sortValue: (row) => row.yearsRemaining,
-      render: (row) => row.yearsRemaining,
+      sortValue: (row) => row.keeperYearsRemaining,
+      render: (row) => row.keeperYearsRemaining,
     },
     {
       id: "assetValue",
@@ -159,7 +165,7 @@ export function createAssetColumns({
         row.assetValue !== null ? (
           <Tooltip content={<AssetValueBreakdown player={row} />}>
             <span className="cursor-default text-base font-semibold text-gold">
-              {formatCompactValue(row.assetValue)}
+              {formatDollarValue(row.assetValue)}
             </span>
           </Tooltip>
         ) : (

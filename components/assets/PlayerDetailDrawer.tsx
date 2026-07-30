@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import type { LeaguePlayer } from "@/lib/league-players";
 import { PlayerHeadshot } from "./PlayerHeadshot";
-import { formatCompactValue } from "./format";
+import { formatDollarValue } from "./format";
 
 type PlayerDetailDrawerProps = {
   player: LeaguePlayer | null;
@@ -89,7 +89,7 @@ export function PlayerDetailDrawer({
               }`}
             >
               {player.marketValue !== null
-                ? formatCompactValue(player.marketValue)
+                ? formatDollarValue(player.marketValue)
                 : "—"}
             </dd>
           </div>
@@ -99,7 +99,7 @@ export function PlayerDetailDrawer({
               Keeper Cost
             </dt>
             <dd className="mt-1 text-xl text-ink">
-              {formatCompactValue(player.keeperCost)}
+              {formatDollarValue(player.keeperCost)}
             </dd>
           </div>
 
@@ -117,7 +117,7 @@ export function PlayerDetailDrawer({
               }`}
             >
               {player.keeperSurplus !== null
-                ? `${player.keeperSurplus >= 0 ? "+" : ""}${formatCompactValue(player.keeperSurplus)}`
+                ? `${player.keeperSurplus >= 0 ? "+" : ""}${formatDollarValue(player.keeperSurplus)}`
                 : "—"}
             </dd>
           </div>
@@ -126,7 +126,9 @@ export function PlayerDetailDrawer({
             <dt className="text-xs font-medium uppercase tracking-wide text-ink/50">
               Years Remaining
             </dt>
-            <dd className="mt-1 text-xl text-ink">{player.yearsRemaining}</dd>
+            <dd className="mt-1 text-xl text-ink">
+              {player.keeperYearsRemaining}
+            </dd>
           </div>
 
           <div className="border-t border-black/10 pt-5">
@@ -139,7 +141,7 @@ export function PlayerDetailDrawer({
               }`}
             >
               {player.assetValue !== null
-                ? formatCompactValue(player.assetValue)
+                ? formatDollarValue(player.assetValue)
                 : "—"}
             </dd>
           </div>

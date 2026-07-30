@@ -5,16 +5,18 @@ import {
   type FantasyCalcPlayer,
 } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
-import {
-  getPlaceholderKeeperCost,
-  getPlaceholderYearsRemaining,
-} from "./valuation/placeholder-contract";
+import { convertFantasyCalcToMarketValue } from "./services/marketValueService";
+import { getPlaceholderContract } from "./valuation/placeholder-contract";
 
 /**
  * An NFL player in the context of one specific league — wraps the
  * immutable NFLPlayer (from Sleeper) with league-specific state. Every
  * asset DLFO tracks is Player + Contract + Economics; this type is all
  * three combined.
+ *
+ * Every economic field here is in auction dollars ($) — the currency
+ * used at the real draft table — not FantasyCalc points. FantasyCalc is
+ * an input to marketValue, not the value itself.
  */
 export type LeaguePlayer = {
   nflPlayer: NFLPlayer;
@@ -22,17 +24,23 @@ export type LeaguePlayer = {
   currentOwnerName: string | null;
 
   /**
-   * The player's real-world talent/production value. Sourced entirely
-   * from FantasyCalc today (lib/services/fantasycalc.ts); null if
-   * unmatched — never faked.
-   *
-   * TODO(market-value-blend): eventually this becomes a blend —
-   *   Market Value = FantasyCalc + FantasyPros + PFF + DLFO Projection Engine
-   * Not implemented yet. FantasyCalc is the sole input for now.
+   * Raw FantasyCalc dynasty value, in FantasyCalc points — not dollars.
+   * No longer DLFO's primary valuation metric; kept in the data model as
+   * the input to marketValue, but hidden from the default table view.
+   * Null if unmatched — never faked.
+   */
+  fantasyCalc: number | null;
+  /** Real 30-day point change from FantasyCalc; null if unmatched. */
+  fantasyCalcTrend30Day: number | null;
+
+  /**
+   * Estimated auction market value, in dollars — DLFO's real currency,
+   * the same one used at the actual draft table. Converted from
+   * fantasyCalc via lib/services/marketValueService.ts. Null whenever
+   * fantasyCalc is null (nothing to convert).
    */
   marketValue: number | null;
-  /** Real 30-day value change from FantasyCalc; null if unmatched. */
-  marketValueTrend30Day: number | null;
+
   /**
    * Real Expert Consensus Ranking from FantasyPros; always null today — no
    * licensed API key exists yet. See lib/services/fantasypros.ts for why,
@@ -41,34 +49,33 @@ export type LeaguePlayer = {
   fantasyProsECR: number | null;
 
   /**
-   * Contract economics. keeperCost and yearsRemaining are PLACEHOLDERS —
-   * see lib/valuation/placeholder-contract.ts for the deterministic
-   * stand-in generator and the documented (not yet implemented) real
-   * contract rules governing how these actually change over time.
+   * Contract fields, all in dollars. originalAuctionPrice, keeperCost,
+   * draftYear, and keeperYearsRemaining are all PLACEHOLDERS today — see
+   * lib/valuation/placeholder-contract.ts for the generator and the
+   * documented (not yet implemented) real contract rules. Once
+   * lib/auction-history.ts is populated with real results, these come
+   * from there instead, with zero dependency on marketValue/fantasyCalc.
    */
+  originalAuctionPrice: number;
   keeperCost: number;
-  yearsRemaining: number;
+  draftYear: number;
+  keeperYearsRemaining: number;
 
   /**
-   * Keeper Surplus = Market (Auction) Value − Keeper Cost.
-   *
-   * TODO(auction-value): once real auction values exist, swap
-   * marketValue below for auctionValue in this formula. marketValue is a
-   * stand-in until then.
-   *
-   * Null whenever marketValue is null — surplus is meaningless without a
-   * real value to weigh the contract against.
+   * Keeper Surplus = Market Value − Keeper Cost, in dollars. Null
+   * whenever marketValue is null — surplus is meaningless without a real
+   * value to weigh the contract against.
    */
   keeperSurplus: number | null;
 
   /**
-   * Asset Value = Market Value + Keeper Surplus. DLFO's primary ranking —
-   * "how good is the player" combined with "how good is the contract."
+   * Asset Value = Market Value + Keeper Surplus, in dollars. DLFO's
+   * primary ranking — "how good is the player" combined with "how good
+   * is the contract."
    */
   assetValue: number | null;
 
   // Reserved for future features — never populated yet.
-  auctionValue?: number;
   pffGrade?: number;
 };
 
@@ -121,12 +128,13 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       fantasyProsValues.get(nflPlayer.id) ??
       fantasyProsValues.get(normalizePlayerName(nflPlayer.fullName));
 
-    const marketValue = fantasyCalcMatch?.value ?? null;
-    const keeperCost = getPlaceholderKeeperCost(nflPlayer.id, marketValue);
-    const yearsRemaining = getPlaceholderYearsRemaining(nflPlayer.id);
+    const fantasyCalc = fantasyCalcMatch?.value ?? null;
+    const marketValue =
+      fantasyCalc !== null ? convertFantasyCalcToMarketValue(fantasyCalc) : null;
 
-    // See the TODO(auction-value) note on LeaguePlayer above — marketValue
-    // stands in for auctionValue until that's implemented.
+    const { originalAuctionPrice, keeperCost, draftYear, keeperYearsRemaining } =
+      getPlaceholderContract(nflPlayer.id, marketValue);
+
     const keeperSurplus =
       marketValue !== null ? marketValue - keeperCost : null;
     const assetValue =
@@ -138,11 +146,14 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       currentOwnerName: ownerId
         ? ownerNameByUserId.get(ownerId) ?? null
         : null,
+      fantasyCalc,
+      fantasyCalcTrend30Day: fantasyCalcMatch?.trend30Day ?? null,
       marketValue,
-      marketValueTrend30Day: fantasyCalcMatch?.trend30Day ?? null,
       fantasyProsECR: fantasyProsMatch?.ecr ?? null,
+      originalAuctionPrice,
       keeperCost,
-      yearsRemaining,
+      draftYear,
+      keeperYearsRemaining,
       keeperSurplus,
       assetValue,
     };

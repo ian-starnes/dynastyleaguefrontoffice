@@ -4,12 +4,13 @@ import { getPlayerProfile, type PlayerProfile } from "@/lib/player-profile";
 import { Card } from "@/components/ui/Card";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { PlayerHeadshot } from "@/components/assets/PlayerHeadshot";
-import { formatCompactValue } from "@/components/assets/format";
+import { formatDollarValue } from "@/components/assets/format";
 
 // Genuinely not implemented yet — no subsystem exists for any of these.
 // Listed as labels only; never a fabricated number. (Market Value, Keeper
 // Cost, Keeper Surplus, Years Remaining, and Asset Value all moved out of
-// this list once they became real — even placeholder-backed — fields.)
+// this list once they became real — even placeholder-backed — fields, all
+// in auction dollars.)
 const COMING_SOON_FEATURES = ["Auction Value", "PFF Grade", "Trade Analyzer"];
 
 function BackLink() {
@@ -20,23 +21,6 @@ function BackLink() {
     >
       ← Assets
     </Link>
-  );
-}
-
-function TrendBadge({ trend }: { trend: number | null }) {
-  if (trend === null || trend === 0) return null;
-
-  const isUp = trend > 0;
-
-  return (
-    <span
-      className={`inline-flex items-center gap-1 text-sm font-medium ${
-        isUp ? "text-primary" : "text-red-700"
-      }`}
-    >
-      <span aria-hidden>{isUp ? "▲" : "▼"}</span>
-      {formatCompactValue(Math.abs(trend))} · 30d
-    </span>
   );
 }
 
@@ -101,7 +85,7 @@ export default async function PlayerProfilePage({
         </div>
       </div>
 
-      {/* Asset Value leads — DLFO's primary ranking, not just another number. */}
+      {/* Asset Value leads — DLFO's primary ranking, in auction dollars. */}
       <Card className="mt-8 p-6">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
           Asset Value
@@ -110,20 +94,20 @@ export default async function PlayerProfilePage({
           <Tooltip
             content={
               <div className="space-y-1">
-                <p>{formatCompactValue(player.marketValue!)} Market Value</p>
+                <p>{formatDollarValue(player.marketValue!)} Market Value</p>
                 <p>
                   {player.keeperSurplus >= 0 ? "+" : ""}
-                  {formatCompactValue(player.keeperSurplus)} Keeper Surplus
+                  {formatDollarValue(player.keeperSurplus)} Keeper Surplus
                 </p>
                 <div className="my-1 border-t border-background/20" />
                 <p className="font-semibold">
-                  {formatCompactValue(player.assetValue)} Asset Value
+                  {formatDollarValue(player.assetValue)} Asset Value
                 </p>
               </div>
             }
           >
             <p className="mt-2 inline-block cursor-default font-serif text-5xl font-semibold text-gold">
-              {formatCompactValue(player.assetValue)}
+              {formatDollarValue(player.assetValue)}
             </p>
           </Tooltip>
         ) : (
@@ -144,12 +128,9 @@ export default async function PlayerProfilePage({
             }`}
           >
             {player.marketValue !== null
-              ? formatCompactValue(player.marketValue)
+              ? formatDollarValue(player.marketValue)
               : "—"}
           </p>
-          <div className="mt-2 h-5">
-            <TrendBadge trend={player.marketValueTrend30Day} />
-          </div>
         </Card>
 
         <Card className="p-6">
@@ -157,7 +138,7 @@ export default async function PlayerProfilePage({
             Keeper Cost
           </p>
           <p className="mt-2 font-serif text-3xl text-ink">
-            {formatCompactValue(player.keeperCost)}
+            {formatDollarValue(player.keeperCost)}
           </p>
         </Card>
 
@@ -175,7 +156,7 @@ export default async function PlayerProfilePage({
             }`}
           >
             {player.keeperSurplus !== null
-              ? `${player.keeperSurplus >= 0 ? "+" : ""}${formatCompactValue(player.keeperSurplus)}`
+              ? `${player.keeperSurplus >= 0 ? "+" : ""}${formatDollarValue(player.keeperSurplus)}`
               : "—"}
           </p>
         </Card>
@@ -185,7 +166,7 @@ export default async function PlayerProfilePage({
             Years Remaining
           </p>
           <p className="mt-2 font-serif text-3xl text-ink">
-            {player.yearsRemaining}
+            {player.keeperYearsRemaining}
           </p>
         </Card>
 
