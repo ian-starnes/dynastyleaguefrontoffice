@@ -71,7 +71,11 @@ export function useTableState<S>(
   // downstream memoization (e.g. a memoized column config or table row).
   const setState = useCallback(
     (next: Updater<S>) => {
-      contextSetState(tableId, (prev) => {
+      // Explicit `unknown` annotation is required here: Updater<unknown>'s
+      // `unknown | (fn)` union can't be disambiguated for contextual typing
+      // the way e.g. React's SetStateAction<S> can when S is a concrete
+      // type, since `unknown` itself already matches anything.
+      contextSetState(tableId, (prev: unknown) => {
         const prevState = (prev as S | undefined) ?? defaultState;
         return typeof next === "function"
           ? (next as (prev: S) => S)(prevState)

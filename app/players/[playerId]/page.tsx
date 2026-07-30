@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPlayerProfile } from "@/lib/player-profile";
+import { getPlayerProfile, type PlayerProfile } from "@/lib/player-profile";
 import { Card } from "@/components/ui/Card";
 import { PlayerHeadshot } from "@/components/players/PlayerHeadshot";
 import { formatCompactValue } from "@/components/players/format";
@@ -58,7 +58,7 @@ export default async function PlayerProfilePage({
 }) {
   const { playerId } = await params;
 
-  let profile;
+  let profile: PlayerProfile | null;
   try {
     profile = await getPlayerProfile(playerId);
   } catch (error) {
