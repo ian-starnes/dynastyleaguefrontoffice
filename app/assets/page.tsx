@@ -1,23 +1,23 @@
 import { getLeaguePlayers } from "@/lib/league-players";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { PlayersExplorer } from "@/components/players/PlayersExplorer";
+import { AssetsExplorer } from "@/components/assets/AssetsExplorer";
 
 // Server Component: all Sleeper access happens through lib/sleeper (and the
 // lib/league-players join on top of it) — never directly inside a UI
 // component.
-export default async function PlayersPage() {
+export default async function AssetsPage() {
   try {
     const players = await getLeaguePlayers();
 
     return (
       <div>
         <PageHeader
-          title="Players"
-          description="Live NFL player and roster data from Sleeper."
+          title="Assets"
+          description="Every player, contract, and the economics behind what they're actually worth to your franchise."
         />
         <div className="mt-8">
-          <PlayersExplorer players={players} />
+          <AssetsExplorer players={players} />
         </div>
       </div>
     );
@@ -25,8 +25,8 @@ export default async function PlayersPage() {
     return (
       <div>
         <PageHeader
-          title="Players"
-          description="Live NFL player and roster data from Sleeper."
+          title="Assets"
+          description="Every player, contract, and the economics behind what they're actually worth to your franchise."
         />
         <Card className="mt-8 p-8">
           <p className="text-sm text-ink/60">

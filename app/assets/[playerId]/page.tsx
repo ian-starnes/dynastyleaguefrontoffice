@@ -2,26 +2,23 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPlayerProfile, type PlayerProfile } from "@/lib/player-profile";
 import { Card } from "@/components/ui/Card";
-import { PlayerHeadshot } from "@/components/players/PlayerHeadshot";
-import { formatCompactValue } from "@/components/players/format";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { PlayerHeadshot } from "@/components/assets/PlayerHeadshot";
+import { formatCompactValue } from "@/components/assets/format";
 
-// Deliberately not implemented yet — no subsystem exists for any of these.
-// Listed as labels only; never a fabricated number.
-const COMING_SOON_FEATURES = [
-  "DLFO Value",
-  "Keeper Cost",
-  "Contract Years Remaining",
-  "Surplus Value",
-  "Trade Analyzer",
-];
+// Genuinely not implemented yet — no subsystem exists for any of these.
+// Listed as labels only; never a fabricated number. (Market Value, Keeper
+// Cost, Keeper Surplus, Years Remaining, and Asset Value all moved out of
+// this list once they became real — even placeholder-backed — fields.)
+const COMING_SOON_FEATURES = ["Auction Value", "PFF Grade", "Trade Analyzer"];
 
 function BackLink() {
   return (
     <Link
-      href="/players"
+      href="/assets"
       className="text-sm font-medium text-ink/50 hover:text-primary"
     >
-      ← Players
+      ← Assets
     </Link>
   );
 }
@@ -104,19 +101,92 @@ export default async function PlayerProfilePage({
         </div>
       </div>
 
-      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+      {/* Asset Value leads — DLFO's primary ranking, not just another number. */}
+      <Card className="mt-8 p-6">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          Asset Value
+        </p>
+        {player.assetValue !== null && player.keeperSurplus !== null ? (
+          <Tooltip
+            content={
+              <div className="space-y-1">
+                <p>{formatCompactValue(player.marketValue!)} Market Value</p>
+                <p>
+                  {player.keeperSurplus >= 0 ? "+" : ""}
+                  {formatCompactValue(player.keeperSurplus)} Keeper Surplus
+                </p>
+                <div className="my-1 border-t border-background/20" />
+                <p className="font-semibold">
+                  {formatCompactValue(player.assetValue)} Asset Value
+                </p>
+              </div>
+            }
+          >
+            <p className="mt-2 inline-block cursor-default font-serif text-5xl font-semibold text-gold">
+              {formatCompactValue(player.assetValue)}
+            </p>
+          </Tooltip>
+        ) : (
+          <p className="mt-2 font-serif text-5xl font-semibold text-ink/30">
+            —
+          </p>
+        )}
+      </Card>
+
+      <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="p-6">
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-            FantasyCalc Value
+            Market Value
           </p>
-          <p className="mt-2 font-serif text-3xl text-primary">
-            {player.fantasyCalcValue !== null
-              ? formatCompactValue(player.fantasyCalcValue)
+          <p
+            className={`mt-2 font-serif text-3xl ${
+              player.marketValue !== null ? "text-blue-800" : "text-ink/30"
+            }`}
+          >
+            {player.marketValue !== null
+              ? formatCompactValue(player.marketValue)
               : "—"}
           </p>
           <div className="mt-2 h-5">
-            <TrendBadge trend={player.fantasyCalcTrend30Day} />
+            <TrendBadge trend={player.marketValueTrend30Day} />
           </div>
+        </Card>
+
+        <Card className="p-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            Keeper Cost
+          </p>
+          <p className="mt-2 font-serif text-3xl text-ink">
+            {formatCompactValue(player.keeperCost)}
+          </p>
+        </Card>
+
+        <Card className="p-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            Keeper Surplus
+          </p>
+          <p
+            className={`mt-2 font-serif text-3xl ${
+              player.keeperSurplus === null
+                ? "text-ink/30"
+                : player.keeperSurplus >= 0
+                  ? "text-primary"
+                  : "text-red-700"
+            }`}
+          >
+            {player.keeperSurplus !== null
+              ? `${player.keeperSurplus >= 0 ? "+" : ""}${formatCompactValue(player.keeperSurplus)}`
+              : "—"}
+          </p>
+        </Card>
+
+        <Card className="p-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+            Years Remaining
+          </p>
+          <p className="mt-2 font-serif text-3xl text-ink">
+            {player.yearsRemaining}
+          </p>
         </Card>
 
         <Card className="p-6">

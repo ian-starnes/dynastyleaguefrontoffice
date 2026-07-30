@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { ChipGroup } from "@/components/ui/ChipGroup";
 import {
@@ -10,24 +10,27 @@ import {
 } from "@/components/ui/DataTable";
 import { getMyOwnerId } from "@/lib/sleeper";
 import type { LeaguePlayer } from "@/lib/league-players";
-import { createPlayerColumns } from "./playerColumns";
+import { createAssetColumns } from "./assetColumns";
 import {
-  PLAYER_FILTERS,
-  matchesPlayerFilter,
+  ASSET_FILTERS,
+  matchesAssetFilter,
   ownerFilterId,
   ownerIdFromFilter,
-  type PlayerFilterId,
-} from "./playerFilters";
-import { PlayerSearchInput } from "./PlayerSearchInput";
+  type AssetFilterId,
+} from "./assetFilters";
+import { AssetSearchInput } from "./AssetSearchInput";
+import { PlayerDetailDrawer } from "./PlayerDetailDrawer";
 
-type PlayersTableState = {
+type AssetsTableState = {
   sort: SortState;
-  filterId: PlayerFilterId;
+  filterId: AssetFilterId;
   search: string;
 };
 
-const DEFAULT_STATE: PlayersTableState = {
-  sort: { columnId: "fantasyCalc", direction: "desc" },
+const DEFAULT_STATE: AssetsTableState = {
+  // Asset Value is DLFO's primary ranking now — market value plus contract
+  // economics, not just "how good is the player."
+  sort: { columnId: "assetValue", direction: "desc" },
   filterId: "all",
   search: "",
 };
@@ -38,20 +41,24 @@ function getPlayerRowKey(row: LeaguePlayer): string {
 }
 
 /**
- * Owns the sort/filter/search state for the players table — persisted via
- * useTableState so it survives navigating to another page and back.
- * Filtering/sorting run over already-fetched data client-side, no need to
- * hit Sleeper again per keystroke or click.
+ * Owns the sort/filter/search state for the assets table — persisted via
+ * useTableState so it survives navigating to another page and back — plus
+ * which asset (if any) has its detail drawer open. Filtering/sorting run
+ * over already-fetched data client-side, no need to hit Sleeper again per
+ * keystroke or click.
  */
-export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
-  const [tableState, setTableState] = useTableState<PlayersTableState>(
-    "players",
+export function AssetsExplorer({ players }: { players: LeaguePlayer[] }) {
+  const [tableState, setTableState] = useTableState<AssetsTableState>(
+    "assets",
     DEFAULT_STATE
+  );
+  const [selectedPlayer, setSelectedPlayer] = useState<LeaguePlayer | null>(
+    null
   );
   const myOwnerId = getMyOwnerId();
 
   const setFilterId = useCallback(
-    (filterId: PlayerFilterId) =>
+    (filterId: AssetFilterId) =>
       setTableState((prev) => ({ ...prev, filterId })),
     [setTableState]
   );
@@ -79,16 +86,26 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
     [setTableState]
   );
 
+  const handlePlayerClick = useCallback((player: LeaguePlayer) => {
+    setSelectedPlayer(player);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => setSelectedPlayer(null), []);
+
   const columns = useMemo(
-    () => createPlayerColumns({ onOwnerClick: handleOwnerClick }),
-    [handleOwnerClick]
+    () =>
+      createAssetColumns({
+        onOwnerClick: handleOwnerClick,
+        onPlayerClick: handlePlayerClick,
+      }),
+    [handleOwnerClick, handlePlayerClick]
   );
 
   const filteredPlayers = useMemo(() => {
     const query = tableState.search.trim().toLowerCase();
 
     return players.filter((player) => {
-      if (!matchesPlayerFilter(player, tableState.filterId, myOwnerId)) {
+      if (!matchesAssetFilter(player, tableState.filterId, myOwnerId)) {
         return false;
       }
 
@@ -119,7 +136,7 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <ChipGroup
-            chips={PLAYER_FILTERS}
+            chips={ASSET_FILTERS}
             activeId={tableState.filterId}
             onChange={setFilterId}
           />
@@ -134,7 +151,7 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
             </button>
           ) : null}
         </div>
-        <PlayerSearchInput value={tableState.search} onChange={setSearch} />
+        <AssetSearchInput value={tableState.search} onChange={setSearch} />
       </div>
 
       <Card className="mt-4">
@@ -144,9 +161,11 @@ export function PlayersExplorer({ players }: { players: LeaguePlayer[] }) {
           rowKey={getPlayerRowKey}
           sort={tableState.sort}
           onSortChange={handleSortChange}
-          emptyMessage="No players match your filters."
+          emptyMessage="No assets match your filters."
         />
       </Card>
+
+      <PlayerDetailDrawer player={selectedPlayer} onClose={handleDrawerClose} />
     </div>
   );
 }

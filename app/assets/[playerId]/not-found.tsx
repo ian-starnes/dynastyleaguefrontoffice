@@ -5,10 +5,10 @@ export default function PlayerNotFound() {
   return (
     <div>
       <Link
-        href="/players"
+        href="/assets"
         className="text-sm font-medium text-ink/50 hover:text-primary"
       >
-        ← Players
+        ← Assets
       </Link>
       <Card className="mt-6 p-8">
         <p className="text-sm text-ink/60">

@@ -2,7 +2,7 @@ import {
   Landmark,
   Trophy,
   Users,
-  User,
+  Wallet,
   ArrowLeftRight,
   Settings,
   type LucideIcon,
@@ -20,7 +20,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Front Office", href: "/", icon: Landmark },
   { label: "League", href: "/league", icon: Trophy },
   { label: "Teams", href: "/teams", icon: Users },
-  { label: "Players", href: "/players", icon: User },
+  { label: "Assets", href: "/assets", icon: Wallet },
   { label: "Trades", href: "/trades", icon: ArrowLeftRight },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

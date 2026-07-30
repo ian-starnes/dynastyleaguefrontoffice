@@ -2,7 +2,7 @@ import type { LeaguePlayer } from "@/lib/league-players";
 
 const OWNER_FILTER_PREFIX = "owner:";
 
-export type PlayerFilterId =
+export type AssetFilterId =
   | "all"
   | "QB"
   | "RB"
@@ -13,7 +13,7 @@ export type PlayerFilterId =
   | "my-team"
   | `${typeof OWNER_FILTER_PREFIX}${string}`;
 
-export const PLAYER_FILTERS: { id: PlayerFilterId; label: string }[] = [
+export const ASSET_FILTERS: { id: AssetFilterId; label: string }[] = [
   { id: "all", label: "All" },
   { id: "QB", label: "QB" },
   { id: "RB", label: "RB" },
@@ -24,19 +24,19 @@ export const PLAYER_FILTERS: { id: PlayerFilterId; label: string }[] = [
   { id: "my-team", label: "My Team" },
 ];
 
-export function ownerFilterId(ownerId: string): PlayerFilterId {
+export function ownerFilterId(ownerId: string): AssetFilterId {
   return `${OWNER_FILTER_PREFIX}${ownerId}`;
 }
 
-export function ownerIdFromFilter(filterId: PlayerFilterId): string | null {
+export function ownerIdFromFilter(filterId: AssetFilterId): string | null {
   return filterId.startsWith(OWNER_FILTER_PREFIX)
     ? filterId.slice(OWNER_FILTER_PREFIX.length)
     : null;
 }
 
-export function matchesPlayerFilter(
+export function matchesAssetFilter(
   player: LeaguePlayer,
-  filterId: PlayerFilterId,
+  filterId: AssetFilterId,
   myOwnerId: string | null
 ): boolean {
   const clickedOwnerId = ownerIdFromFilter(filterId);

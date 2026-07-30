@@ -1,15 +1,12 @@
 "use client";
 
-type PlayerSearchInputProps = {
+type AssetSearchInputProps = {
   value: string;
   onChange: (value: string) => void;
 };
 
 /** Controlled search input — reusable anywhere a filterable list needs one. */
-export function PlayerSearchInput({
-  value,
-  onChange,
-}: PlayerSearchInputProps) {
+export function AssetSearchInput({ value, onChange }: AssetSearchInputProps) {
   return (
     <input
       type="search"
