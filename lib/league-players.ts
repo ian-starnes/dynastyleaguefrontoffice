@@ -6,8 +6,15 @@ import {
 } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
 import { calculateAssetEconomics } from "./services/assetCalculator";
-import { convertFantasyCalcToMarketValue } from "./services/marketValueService";
-import { getPlaceholderContractFacts } from "./valuation/placeholder-contract";
+import {
+  getPriorSeasonAuctionData,
+  type PriorSeasonAuctionData,
+} from "./services/auctionHistoryService";
+import { getPlaceholderKeeperYearsRemaining } from "./valuation/placeholder-contract";
+
+// Any currently-rostered player not found in the prior season's auction
+// (picked up via waiver/free agency since) is a $5 contract by convention.
+const UNDRAFTED_CONTRACT_PRICE = 5;
 
 /**
  * An NFL player in the context of one specific league — wraps the
@@ -48,14 +55,13 @@ export type LeaguePlayer = {
   fantasyProsECR: number | null;
 
   /**
-   * Contract facts, all in dollars/years. originalAuctionPrice, draftYear,
-   * and keeperYearsRemaining are all PLACEHOLDERS today — see
-   * lib/valuation/placeholder-contract.ts for the generator and the
-   * documented (not yet implemented) real contract rules. Once
-   * lib/repositories/AssetRepository.ts is wired to real Postgres facts
-   * (backed by the historical import — see lib/import/leagueImportService.ts
-   * and lib/repositories/AuctionRecordRepository.ts), these come from
-   * there instead, with zero dependency on marketValue/fantasyCalc.
+   * Contract facts, all in dollars/years. originalAuctionPrice and
+   * draftYear are REAL — sourced from the prior season's actual auction
+   * (see lib/services/auctionHistoryService.ts), or the $5 undrafted
+   * convention for a rostered player who wasn't part of it.
+   * keeperYearsRemaining is still a PLACEHOLDER — see
+   * lib/valuation/placeholder-contract.ts for why (it needs multi-season
+   * history this app doesn't have wired up yet).
    */
   originalAuctionPrice: number;
   draftYear: number;
@@ -76,22 +82,35 @@ export type LeaguePlayer = {
  * today, only) place an NFLPlayer becomes a LeaguePlayer.
  */
 export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
-  const [[players, rosters, owners], fantasyCalcValues, fantasyProsValues] =
-    await Promise.all([
-      Promise.all([getPlayers(), getRosters(), getOwners()]),
-      // FantasyCalc is supplementary, not essential — if it's unreachable,
-      // every player just shows "—" instead of taking down the whole page.
-      getFantasyCalcValues().catch((error: unknown) => {
-        console.error(
-          "FantasyCalc fetch failed, showing — for all players:",
-          error
-        );
-        return new Map<string, FantasyCalcPlayer>();
-      }),
-      // Stubbed until a licensed FantasyPros key exists — resolves to an
-      // empty map today, so every match below is a no-op (null).
-      getFantasyProsValues(),
-    ]);
+  const [
+    [players, rosters, owners],
+    fantasyCalcValues,
+    fantasyProsValues,
+    priorSeasonAuctionData,
+  ] = await Promise.all([
+    Promise.all([getPlayers(), getRosters(), getOwners()]),
+    // FantasyCalc is supplementary, not essential — if it's unreachable,
+    // every player just shows "—" instead of taking down the whole page.
+    getFantasyCalcValues().catch((error: unknown) => {
+      console.error(
+        "FantasyCalc fetch failed, showing — for all players:",
+        error
+      );
+      return new Map<string, FantasyCalcPlayer>();
+    }),
+    // Stubbed until a licensed FantasyPros key exists — resolves to an
+    // empty map today, so every match below is a no-op (null).
+    getFantasyProsValues(),
+    // Same resilience pattern — if Sleeper's historical endpoints hiccup,
+    // everyone just falls back to the $5 undrafted convention.
+    getPriorSeasonAuctionData().catch((error: unknown) => {
+      console.error(
+        "Prior season auction fetch failed, treating everyone as undrafted:",
+        error
+      );
+      return null as PriorSeasonAuctionData | null;
+    }),
+  ]);
 
   const ownerNameByUserId = new Map(
     owners.map((owner) => [
@@ -121,14 +140,18 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
 
     const fantasyCalc = fantasyCalcMatch?.value ?? null;
 
-    // Placeholder facts until AssetRepository has real rows to read
-    // instead — anchored off marketValue purely so the placeholder looks
-    // plausible relative to it (see placeholder-contract.ts's doc comment).
-    const marketValueEstimate =
-      fantasyCalc !== null ? convertFantasyCalcToMarketValue(fantasyCalc) : null;
+    const realAuctionPrice = priorSeasonAuctionData?.pricesByPlayerId.get(
+      nflPlayer.id
+    );
+    const originalAuctionPrice = realAuctionPrice ?? UNDRAFTED_CONTRACT_PRICE;
+    const draftYear =
+      realAuctionPrice !== undefined
+        ? priorSeasonAuctionData!.season
+        : (priorSeasonAuctionData?.season ?? 2025) + 1;
 
-    const { originalAuctionPrice, draftYear, keeperYearsRemaining } =
-      getPlaceholderContractFacts(nflPlayer.id, marketValueEstimate);
+    const keeperYearsRemaining = getPlaceholderKeeperYearsRemaining(
+      nflPlayer.id
+    );
 
     const { marketValue, keeperCost, keeperSurplus, assetValue } =
       calculateAssetEconomics({
