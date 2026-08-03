@@ -16,7 +16,7 @@
  *   - FantasyCalc (the only input today)
  *   - FantasyPros ECR
  *   - PFF grades
- *   - Historical auction results (lib/auction-history.ts)
+ *   - Historical auction results (lib/repositories/AuctionRecordRepository.ts)
  *   - DLFO's own projection engine
  *   - League settings (budget, roster size, scoring format)
  *   - Position scarcity

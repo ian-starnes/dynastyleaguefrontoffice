@@ -5,8 +5,9 @@ import {
   type FantasyCalcPlayer,
 } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
+import { calculateAssetEconomics } from "./services/assetCalculator";
 import { convertFantasyCalcToMarketValue } from "./services/marketValueService";
-import { getPlaceholderContract } from "./valuation/placeholder-contract";
+import { getPlaceholderContractFacts } from "./valuation/placeholder-contract";
 
 /**
  * An NFL player in the context of one specific league — wraps the
@@ -16,7 +17,10 @@ import { getPlaceholderContract } from "./valuation/placeholder-contract";
  *
  * Every economic field here is in auction dollars ($) — the currency
  * used at the real draft table — not FantasyCalc points. FantasyCalc is
- * an input to marketValue, not the value itself.
+ * an input to marketValue, not the value itself. marketValue, keeperCost,
+ * keeperSurplus, and assetValue are all computed exclusively by
+ * lib/services/assetCalculator.ts — nothing else in the codebase does
+ * that arithmetic.
  */
 export type LeaguePlayer = {
   nflPlayer: NFLPlayer;
@@ -33,12 +37,7 @@ export type LeaguePlayer = {
   /** Real 30-day point change from FantasyCalc; null if unmatched. */
   fantasyCalcTrend30Day: number | null;
 
-  /**
-   * Estimated auction market value, in dollars — DLFO's real currency,
-   * the same one used at the actual draft table. Converted from
-   * fantasyCalc via lib/services/marketValueService.ts. Null whenever
-   * fantasyCalc is null (nothing to convert).
-   */
+  /** Estimated auction market value, in dollars. See assetCalculator.ts. */
   marketValue: number | null;
 
   /**
@@ -49,30 +48,22 @@ export type LeaguePlayer = {
   fantasyProsECR: number | null;
 
   /**
-   * Contract fields, all in dollars. originalAuctionPrice, keeperCost,
-   * draftYear, and keeperYearsRemaining are all PLACEHOLDERS today — see
+   * Contract facts, all in dollars/years. originalAuctionPrice, draftYear,
+   * and keeperYearsRemaining are all PLACEHOLDERS today — see
    * lib/valuation/placeholder-contract.ts for the generator and the
    * documented (not yet implemented) real contract rules. Once
-   * lib/auction-history.ts is populated with real results, these come
-   * from there instead, with zero dependency on marketValue/fantasyCalc.
+   * lib/repositories/AssetRepository.ts is wired to real Postgres facts
+   * (backed by the historical import — see lib/import/leagueImportService.ts
+   * and lib/repositories/AuctionRecordRepository.ts), these come from
+   * there instead, with zero dependency on marketValue/fantasyCalc.
    */
   originalAuctionPrice: number;
-  keeperCost: number;
   draftYear: number;
   keeperYearsRemaining: number;
 
-  /**
-   * Keeper Surplus = Market Value − Keeper Cost, in dollars. Null
-   * whenever marketValue is null — surplus is meaningless without a real
-   * value to weigh the contract against.
-   */
+  /** keeperCost, keeperSurplus, assetValue: see assetCalculator.ts. */
+  keeperCost: number;
   keeperSurplus: number | null;
-
-  /**
-   * Asset Value = Market Value + Keeper Surplus, in dollars. DLFO's
-   * primary ranking — "how good is the player" combined with "how good
-   * is the contract."
-   */
   assetValue: number | null;
 
   // Reserved for future features — never populated yet.
@@ -129,16 +120,22 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       fantasyProsValues.get(normalizePlayerName(nflPlayer.fullName));
 
     const fantasyCalc = fantasyCalcMatch?.value ?? null;
-    const marketValue =
+
+    // Placeholder facts until AssetRepository has real rows to read
+    // instead — anchored off marketValue purely so the placeholder looks
+    // plausible relative to it (see placeholder-contract.ts's doc comment).
+    const marketValueEstimate =
       fantasyCalc !== null ? convertFantasyCalcToMarketValue(fantasyCalc) : null;
 
-    const { originalAuctionPrice, keeperCost, draftYear, keeperYearsRemaining } =
-      getPlaceholderContract(nflPlayer.id, marketValue);
+    const { originalAuctionPrice, draftYear, keeperYearsRemaining } =
+      getPlaceholderContractFacts(nflPlayer.id, marketValueEstimate);
 
-    const keeperSurplus =
-      marketValue !== null ? marketValue - keeperCost : null;
-    const assetValue =
-      marketValue !== null ? marketValue + (keeperSurplus as number) : null;
+    const { marketValue, keeperCost, keeperSurplus, assetValue } =
+      calculateAssetEconomics({
+        fantasyCalc,
+        originalAuctionPrice,
+        keeperYearsRemaining,
+      });
 
     return {
       nflPlayer,
@@ -151,9 +148,9 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       marketValue,
       fantasyProsECR: fantasyProsMatch?.ecr ?? null,
       originalAuctionPrice,
-      keeperCost,
       draftYear,
       keeperYearsRemaining,
+      keeperCost,
       keeperSurplus,
       assetValue,
     };

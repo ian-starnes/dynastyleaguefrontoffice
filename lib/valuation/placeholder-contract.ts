@@ -1,25 +1,29 @@
+import { MAX_KEEPER_YEARS } from "@/lib/services/assetCalculator";
+
 /**
- * Stand-ins for DLFO's future keeper contract system. Deterministic per
+ * Stand-ins for DLFO's future keeper contract FACTS. Deterministic per
  * player (same input always produces the same output) so numbers look
  * stable across reloads — none of this reflects a real auction result.
- * It exists purely so Keeper Cost, Keeper Surplus, and Asset Value can be
- * demonstrated in real dollars before real contract history exists.
+ * Used only until lib/repositories/AssetRepository.ts has real rows to
+ * read instead (backed by lib/repositories/AuctionRecordRepository.ts's
+ * historical import data).
+ *
+ * Deliberately produces FACTS only (originalAuctionPrice, draftYear,
+ * keeperYearsRemaining) — not keeperCost. Keeper Cost is a derived
+ * economics figure now computed exclusively by
+ * lib/services/assetCalculator.ts, from these facts, so there's exactly
+ * one place in the codebase that does that arithmetic.
  *
  * Contract Philosophy (documented here, NOT implemented yet):
  *   - Keeper Cost is determined exclusively by league history — never
  *     derived from FantasyCalc or Market Value — and never changes except
  *     annual $5/year inflation, or voiding entirely if the player becomes
  *     undrafted.
- *   - Keeper Years Remaining starts at 5, decreases by 1 each offseason,
- *     and resets to 5 whenever the player is traded.
- *   - keeperCost = originalAuctionPrice + ($5 × years already kept)
- *
- * Once lib/auction-history.ts is populated with real results, this whole
- * module goes away — originalAuctionPrice, draftYear, and keeperCost will
- * come directly from a player's actual auction history instead.
+ *   - Keeper Years Remaining starts at MAX_KEEPER_YEARS, decreases by 1
+ *     each offseason, and resets to MAX_KEEPER_YEARS whenever the player
+ *     is traded.
  */
 
-const MAX_KEEPER_YEARS = 5;
 // TODO: pull the real season from lib/sleeper's getLeague() once this
 // stops being a placeholder.
 const CURRENT_SEASON = 2026;
@@ -32,9 +36,8 @@ function hashString(value: string): number {
   return Math.abs(hash);
 }
 
-export type PlaceholderContract = {
+export type PlaceholderContractFacts = {
   originalAuctionPrice: number;
-  keeperCost: number;
   draftYear: number;
   keeperYearsRemaining: number;
 };
@@ -42,24 +45,23 @@ export type PlaceholderContract = {
 /**
  * marketValue (in dollars) only anchors the placeholder
  * originalAuctionPrice so it looks plausible relative to it — a real
- * originalAuctionPrice will come from AuctionHistory and have zero
+ * originalAuctionPrice will come from AuctionRecord history and have zero
  * dependency on current market value.
  */
-export function getPlaceholderContract(
+export function getPlaceholderContractFacts(
   playerId: string,
   marketValue: number | null
-): PlaceholderContract {
+): PlaceholderContractFacts {
   const hash = hashString(`contract:${playerId}`);
 
-  const keeperYearsRemaining = (hash % MAX_KEEPER_YEARS) + 1; // 1-5
+  const keeperYearsRemaining = (hash % MAX_KEEPER_YEARS) + 1; // 1-MAX_KEEPER_YEARS
   const yearsAlreadyKept = MAX_KEEPER_YEARS - keeperYearsRemaining;
 
   const priceFactor = 0.5 + ((hash >>> 3) % 1000) / 1000; // 0.5-1.499
   const base = marketValue ?? 5;
   const originalAuctionPrice = Math.max(1, Math.round(base * priceFactor));
 
-  const keeperCost = originalAuctionPrice + 5 * yearsAlreadyKept;
   const draftYear = CURRENT_SEASON - yearsAlreadyKept;
 
-  return { originalAuctionPrice, keeperCost, draftYear, keeperYearsRemaining };
+  return { originalAuctionPrice, draftYear, keeperYearsRemaining };
 }

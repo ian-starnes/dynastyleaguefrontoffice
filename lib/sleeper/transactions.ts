@@ -2,13 +2,19 @@ import { sleeperFetch } from "./client";
 import { getSleeperLeagueId } from "./config";
 import type { SleeperTransaction } from "./types";
 
-export async function getTransactions(week: number): Promise<SleeperTransaction[]> {
-  const leagueId = getSleeperLeagueId();
-
+/** Unlike getTransactions(), takes an arbitrary league_id — needed for historical seasons. */
+export async function getTransactionsForLeague(
+  leagueId: string,
+  week: number
+): Promise<SleeperTransaction[]> {
   return sleeperFetch<SleeperTransaction[]>(
     `/league/${leagueId}/transactions/${week}`,
     { next: { revalidate: 300 } }
   );
+}
+
+export async function getTransactions(week: number): Promise<SleeperTransaction[]> {
+  return getTransactionsForLeague(getSleeperLeagueId(), week);
 }
 
 // Sleeper has no "all transactions" endpoint — only per-week. Weeks 0–18
@@ -17,10 +23,18 @@ export async function getTransactions(week: number): Promise<SleeperTransaction[
 // current week dynamically.
 const MAX_WEEK = 18;
 
-export async function getAllTransactions(): Promise<SleeperTransaction[]> {
+export async function getAllTransactionsForLeague(
+  leagueId: string
+): Promise<SleeperTransaction[]> {
   const weeks = await Promise.all(
-    Array.from({ length: MAX_WEEK + 1 }, (_, week) => getTransactions(week))
+    Array.from({ length: MAX_WEEK + 1 }, (_, week) =>
+      getTransactionsForLeague(leagueId, week)
+    )
   );
 
   return weeks.flat();
+}
+
+export async function getAllTransactions(): Promise<SleeperTransaction[]> {
+  return getAllTransactionsForLeague(getSleeperLeagueId());
 }

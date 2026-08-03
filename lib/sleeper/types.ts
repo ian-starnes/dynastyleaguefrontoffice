@@ -8,6 +8,8 @@ export type SleeperLeague = {
   sport: string;
   status: string;
   total_rosters: number;
+  previous_league_id: string | null;
+  settings: Record<string, unknown>;
 };
 
 export type SleeperUser = {
@@ -50,6 +52,8 @@ export type SleeperTransaction = {
 export type SleeperDraft = {
   draft_id: string;
   season: string;
+  type: string; // "auction" | "snake" | "linear"
+  status: string;
 };
 
 export type SleeperDraftPick = {
@@ -58,6 +62,18 @@ export type SleeperDraftPick = {
   player_id: string;
   picked_by: string; // user_id; empty string if traded to a roster with no direct pick owner
   roster_id: number;
+  is_keeper: boolean | null;
+  metadata: {
+    amount?: string; // winning bid, auction drafts only
+  };
+};
+
+export type SleeperTradedPick = {
+  season: string;
+  round: number;
+  roster_id: number; // current owner of the pick
+  owner_id: number;
+  previous_owner_id: number;
 };
 
 /**
