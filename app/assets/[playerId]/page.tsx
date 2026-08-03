@@ -4,7 +4,7 @@ import { getPlayerProfile, type PlayerProfile } from "@/lib/player-profile";
 import { Card } from "@/components/ui/Card";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { PlayerHeadshot } from "@/components/assets/PlayerHeadshot";
-import { formatDollarValue } from "@/components/assets/format";
+import { formatDollarValue } from "@/lib/format";
 
 // Genuinely not implemented yet — no subsystem exists for any of these.
 // Listed as labels only; never a fabricated number. (Market Value, Keeper

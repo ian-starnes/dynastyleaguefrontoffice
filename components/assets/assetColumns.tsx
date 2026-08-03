@@ -2,7 +2,7 @@ import type { Column } from "@/components/ui/DataTable";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { LeaguePlayer } from "@/lib/league-players";
 import { PlayerHeadshot } from "./PlayerHeadshot";
-import { formatDollarValue } from "./format";
+import { formatDollarValue } from "@/lib/format";
 
 type AssetColumnsOptions = {
   onOwnerClick: (ownerId: string) => void;

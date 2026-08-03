@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import type { LeaguePlayer } from "@/lib/league-players";
 import { PlayerHeadshot } from "./PlayerHeadshot";
-import { formatDollarValue } from "./format";
+import { formatDollarValue } from "@/lib/format";
 
 type PlayerDetailDrawerProps = {
   player: LeaguePlayer | null;
