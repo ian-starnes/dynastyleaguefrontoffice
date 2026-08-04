@@ -4,7 +4,7 @@ const KEEPER_INFLATION_PER_YEAR = 5;
 
 /**
  * How many offseasons a keeper contract runs before the player returns to
- * the draft pool. Shared with lib/valuation/placeholder-contract.ts so
+ * the draft pool. Shared with lib/services/keeperClockService.ts so
  * there's one canonical definition of the contract length, not two
  * constants that could drift apart.
  */
@@ -13,10 +13,19 @@ export const MAX_KEEPER_YEARS = 5;
 export type AssetCalculatorInput = {
   /** Raw FantasyCalc points, live from lib/services/fantasycalc.ts. Null if unmatched. */
   fantasyCalc: number | null;
-  /** Stored fact — what the asset actually sold for, originally. */
+  /** Stored fact — what the asset actually sold for, as of yearsSincePriceSet seasons ago. */
   originalAuctionPrice: number;
-  /** Stored fact — offseasons remaining before this contract expires (1-MAX_KEEPER_YEARS). */
-  keeperYearsRemaining: number;
+  /**
+   * How many offseasons have passed since originalAuctionPrice was set —
+   * NOT how long the player has been kept in total. originalAuctionPrice
+   * already reflects whatever historical keeper inflation applied up
+   * through the season it was captured in, so only the offseasons since
+   * THEN need a new $5 step. Distinct from keeperYearsRemaining (the
+   * contract's total tenure toward the MAX_KEEPER_YEARS cap, tracked by
+   * lib/services/keeperClockService.ts) — conflating the two would
+   * double-count inflation for anyone kept more than one year.
+   */
+  yearsSincePriceSet: number;
 };
 
 export type AssetEconomics = {
@@ -46,17 +55,16 @@ export type AssetEconomics = {
 export function calculateAssetEconomics({
   fantasyCalc,
   originalAuctionPrice,
-  keeperYearsRemaining,
+  yearsSincePriceSet,
 }: AssetCalculatorInput): AssetEconomics {
   const marketValue =
     fantasyCalc !== null ? convertFantasyCalcToMarketValue(fantasyCalc) : null;
 
   // Keeper Cost is determined exclusively by league history —
-  // originalAuctionPrice plus $5/year inflation for every offseason
-  // already kept. Never derived from fantasyCalc/marketValue.
-  const yearsAlreadyKept = MAX_KEEPER_YEARS - keeperYearsRemaining;
+  // originalAuctionPrice plus $5 for every offseason since that price was
+  // set. Never derived from fantasyCalc/marketValue.
   const keeperCost =
-    originalAuctionPrice + KEEPER_INFLATION_PER_YEAR * yearsAlreadyKept;
+    originalAuctionPrice + KEEPER_INFLATION_PER_YEAR * yearsSincePriceSet;
 
   // TODO(auction-value): once real Market AUCTION Value exists (as opposed
   // to this estimated market value), swap it in here — marketValue is a

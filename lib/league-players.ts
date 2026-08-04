@@ -5,12 +5,12 @@ import {
   type FantasyCalcPlayer,
 } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
-import { calculateAssetEconomics } from "./services/assetCalculator";
+import { calculateAssetEconomics, MAX_KEEPER_YEARS } from "./services/assetCalculator";
 import {
   getPriorSeasonAuctionData,
   type PriorSeasonAuctionData,
 } from "./services/auctionHistoryService";
-import { getPlaceholderKeeperYearsRemaining } from "./valuation/placeholder-contract";
+import { getKeeperClocks, type KeeperClock } from "./services/keeperClockService";
 
 // Any currently-rostered player not found in the prior season's auction
 // (picked up via waiver/free agency since) is a $5 contract by convention.
@@ -55,13 +55,14 @@ export type LeaguePlayer = {
   fantasyProsECR: number | null;
 
   /**
-   * Contract facts, all in dollars/years. originalAuctionPrice and
-   * draftYear are REAL — sourced from the prior season's actual auction
-   * (see lib/services/auctionHistoryService.ts), or the $5 undrafted
-   * convention for a rostered player who wasn't part of it.
-   * keeperYearsRemaining is still a PLACEHOLDER — see
-   * lib/valuation/placeholder-contract.ts for why (it needs multi-season
-   * history this app doesn't have wired up yet).
+   * Contract facts, all real now — no more placeholders anywhere in this
+   * pipeline. originalAuctionPrice and draftYear come from the prior
+   * season's actual auction (lib/services/auctionHistoryService.ts), or
+   * the $5 undrafted convention for a rostered player who wasn't part of
+   * it. keeperYearsRemaining comes from reconstructing ownership across
+   * seasons (lib/services/keeperClockService.ts) — a fresh
+   * MAX_KEEPER_YEARS clock for anyone not currently rostered, since there's
+   * no ownership continuity to trace for them.
    */
   originalAuctionPrice: number;
   draftYear: number;
@@ -87,6 +88,7 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     fantasyCalcValues,
     fantasyProsValues,
     priorSeasonAuctionData,
+    keeperClocks,
   ] = await Promise.all([
     Promise.all([getPlayers(), getRosters(), getOwners()]),
     // FantasyCalc is supplementary, not essential — if it's unreachable,
@@ -109,6 +111,13 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
         error
       );
       return null as PriorSeasonAuctionData | null;
+    }),
+    getKeeperClocks().catch((error: unknown) => {
+      console.error(
+        "Keeper clock reconstruction failed, treating everyone as a fresh contract:",
+        error
+      );
+      return new Map<string, KeeperClock>();
     }),
   ]);
 
@@ -140,24 +149,27 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
 
     const fantasyCalc = fantasyCalcMatch?.value ?? null;
 
+    const priorSeason = priorSeasonAuctionData?.season ?? 2025;
+    const currentSeason = priorSeason + 1;
+
     const realAuctionPrice = priorSeasonAuctionData?.pricesByPlayerId.get(
       nflPlayer.id
     );
     const originalAuctionPrice = realAuctionPrice ?? UNDRAFTED_CONTRACT_PRICE;
-    const draftYear =
-      realAuctionPrice !== undefined
-        ? priorSeasonAuctionData!.season
-        : (priorSeasonAuctionData?.season ?? 2025) + 1;
+    // Real prices come from exactly one season back (priorSeason); the $5
+    // undrafted convention is a fresh, as-of-now price (currentSeason) —
+    // so yearsSincePriceSet is 1 for the former, 0 for the latter.
+    const draftYear = realAuctionPrice !== undefined ? priorSeason : currentSeason;
+    const yearsSincePriceSet = currentSeason - draftYear;
 
-    const keeperYearsRemaining = getPlaceholderKeeperYearsRemaining(
-      nflPlayer.id
-    );
+    const keeperYearsRemaining =
+      keeperClocks.get(nflPlayer.id)?.keeperYearsRemaining ?? MAX_KEEPER_YEARS;
 
     const { marketValue, keeperCost, keeperSurplus, assetValue } =
       calculateAssetEconomics({
         fantasyCalc,
         originalAuctionPrice,
-        keeperYearsRemaining,
+        yearsSincePriceSet,
       });
 
     return {
