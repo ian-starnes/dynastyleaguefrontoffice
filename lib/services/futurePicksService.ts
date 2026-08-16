@@ -4,32 +4,39 @@ import {
   getTradedPicksForLeague,
   getSleeperLeagueId,
 } from "@/lib/sleeper";
-import { getDraftPickValue } from "./draftPickValueService";
+import { getAuctionBudgetCredit } from "@/lib/config/auctionBudgetAppendixA";
 
 /**
  * How many upcoming draft classes to project, starting with the current
  * season (included even if it hasn't happened yet — verified this
- * league's 2026 rookie draft is still "pre_draft"). This league's own
- * traded_picks data only ever references up to 2 draft years out (2026,
- * 2027 at the time this was checked), matching typical dynasty trading
- * convention — adjust here if that changes.
+ * league's 2026 rookie draft is still "pre_draft"). Set to 4 so this
+ * covers currentSeason (2026) through 2029 — the DLFO brief's section 14
+ * explicitly asks for every team to show projected budgets for 2027,
+ * 2028, and 2029. This league's own traded_picks data only ever
+ * references up to 2 years out at the time this was checked, so further-
+ * out years will mostly show each roster still holding its own original
+ * picks — a correct default (Sleeper has no trade to override), not a
+ * gap.
  */
-const FUTURE_DRAFT_YEARS_TO_PROJECT = 2;
+const FUTURE_DRAFT_YEARS_TO_PROJECT = 4;
 
 export type FuturePick = {
   season: number;
   round: number;
   originalRosterId: number;
   currentOwnerRosterId: number;
+  /** The real Auction Budget Credit dollar value for this pick's round, per Appendix A — fixed, not discounted by years out. */
   value: number;
 };
 
 /**
  * Every future rookie draft pick in the league. Ownership defaults to each
  * roster's own original pick, then Sleeper's traded_picks overrides
- * whichever picks have actually changed hands. Value comes from
- * lib/services/draftPickValueService.ts — never computed here directly,
- * so there's one place that formula lives.
+ * whichever picks have actually changed hands. Value comes from the
+ * real, commissioner-provided Appendix A table
+ * (lib/config/auctionBudgetAppendixA.ts) — never computed here directly,
+ * so there's one place that conversion lives, editable without touching
+ * this file.
  */
 export async function getFuturePicks(): Promise<FuturePick[]> {
   const leagueId = getSleeperLeagueId();
@@ -67,7 +74,7 @@ export async function getFuturePicks(): Promise<FuturePick[]> {
           round,
           originalRosterId: roster.roster_id,
           currentOwnerRosterId,
-          value: getDraftPickValue(round, yearsOut),
+          value: getAuctionBudgetCredit(round),
         });
       }
     }
