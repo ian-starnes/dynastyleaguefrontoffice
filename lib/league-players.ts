@@ -11,6 +11,11 @@ import {
   type PriorSeasonAuctionData,
 } from "./services/auctionHistoryService";
 import { getKeeperClocks, type KeeperClock } from "./services/keeperClockService";
+import {
+  getContractLineages,
+  type ContractLineage,
+} from "./services/contractLineageService";
+import type { AcquisitionType } from "./models";
 
 // Any currently-rostered player not found in the prior season's auction
 // (picked up via waiver/free agency since) is a $5 contract by convention.
@@ -73,6 +78,19 @@ export type LeaguePlayer = {
   keeperSurplus: number | null;
   assetValue: number | null;
 
+  /**
+   * The real contract lineage — see lib/services/contractLineageService.ts.
+   * A free agent / unrostered player has no lineage to trace (no roster to
+   * walk), so these default to a fresh, as-of-now contract: contractStartSeason
+   * = current season, no draft owner, acquisitionType "undrafted".
+   */
+  contractStartSeason: number;
+  originalDraftOwnerId: string | null;
+  originalDraftOwnerName: string | null;
+  acquisitionType: AcquisitionType;
+  /** Epoch ms — only set for trade/waiver/free_agent acquisitions. */
+  acquisitionDate: number | null;
+
   // Reserved for future features — never populated yet.
   pffGrade?: number;
 };
@@ -89,6 +107,7 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     fantasyProsValues,
     priorSeasonAuctionData,
     keeperClocks,
+    contractLineages,
   ] = await Promise.all([
     Promise.all([getPlayers(), getRosters(), getOwners()]),
     // FantasyCalc is supplementary, not essential — if it's unreachable,
@@ -118,6 +137,13 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
         error
       );
       return new Map<string, KeeperClock>();
+    }),
+    getContractLineages().catch((error: unknown) => {
+      console.error(
+        "Contract lineage tracing failed, treating everyone as undrafted:",
+        error
+      );
+      return new Map<string, ContractLineage>();
     }),
   ]);
 
@@ -172,6 +198,8 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
         yearsSincePriceSet,
       });
 
+    const lineage = contractLineages.get(nflPlayer.id);
+
     return {
       nflPlayer,
       currentOwnerId: ownerId,
@@ -188,6 +216,13 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       keeperCost,
       keeperSurplus,
       assetValue,
+      contractStartSeason: lineage?.contractStartSeason ?? currentSeason,
+      originalDraftOwnerId: lineage?.originalDraftOwner ?? null,
+      originalDraftOwnerName: lineage?.originalDraftOwner
+        ? ownerNameByUserId.get(lineage.originalDraftOwner) ?? null
+        : null,
+      acquisitionType: lineage?.acquisitionType ?? "undrafted",
+      acquisitionDate: lineage?.acquisitionDate ?? null,
     };
   });
 }

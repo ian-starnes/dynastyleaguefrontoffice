@@ -129,6 +129,8 @@ export type SleeperDraft = {
   season: string;
   type: string; // "auction" | "snake" | "linear"
   status: string;
+  /** Epoch ms — when the last pick was actually made, i.e. when this draft really concluded. */
+  last_picked: number;
 };
 
 export type SleeperDraftPick = {
