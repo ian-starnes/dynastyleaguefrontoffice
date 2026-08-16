@@ -4,7 +4,6 @@ import {
   getDraftsForLeague,
   getDraftPicks,
   getAllTransactionsForLeague,
-  getRosters,
   getSleeperLeagueId,
   type SleeperDraftPick,
 } from "@/lib/sleeper";
@@ -182,48 +181,55 @@ export async function getContractLineages(): Promise<Map<string, ContractLineage
     }
   }
 
-  const rosters = await getRosters();
+  // Every player with SOME real signal — drafted at any point, or added
+  // via any transaction — not just currently-rostered ones. A free agent
+  // who was genuinely drafted (e.g. kept for a season, then dropped)
+  // still has a real contractStartSeason/originalDraftOwner worth
+  // showing; scoping this to current rosters only would silently regress
+  // that back to "undrafted" for anyone not presently held by a team.
+  const allKnownPlayerIds = new Set<string>();
+  for (const season of auctionSeasonsAsc) {
+    for (const playerId of season.picksByPlayerId.keys()) allKnownPlayerIds.add(playerId);
+  }
+  for (const playerId of latestAddTransactionByPlayerId.keys()) {
+    allKnownPlayerIds.add(playerId);
+  }
+
   const lineages = new Map<string, ContractLineage>();
 
-  for (const roster of rosters) {
-    if (!roster.players) continue;
+  for (const playerId of allKnownPlayerIds) {
+    const lineage = traceLineage(playerId, auctionSeasonsAsc);
+    const latestAdd = latestAddTransactionByPlayerId.get(playerId);
 
-    for (const playerId of roster.players) {
-      if (lineages.has(playerId)) continue; // already resolved via an earlier roster
+    // Whichever happened LATER — the most recent auction pick, or the
+    // most recent transaction — is the true current acquisition event.
+    const transactionIsMostRecent =
+      latestAdd !== undefined &&
+      (!lineage || latestAdd.createdAt > lineage.mostRecentAuctionConcludedAt);
 
-      const lineage = traceLineage(playerId, auctionSeasonsAsc);
-      const latestAdd = latestAddTransactionByPlayerId.get(playerId);
+    let acquisitionType: AcquisitionType;
+    let acquisitionDate: number | null = null;
 
-      // Whichever happened LATER — the most recent auction pick, or the
-      // most recent transaction — is the true current acquisition event.
-      const transactionIsMostRecent =
-        latestAdd !== undefined &&
-        (!lineage || latestAdd.createdAt > lineage.mostRecentAuctionConcludedAt);
-
-      let acquisitionType: AcquisitionType;
-      let acquisitionDate: number | null = null;
-
-      if (transactionIsMostRecent) {
-        acquisitionType =
-          latestAdd!.type === "trade"
-            ? "trade"
-            : latestAdd!.type === "waiver"
-              ? "waiver"
-              : "free_agent";
-        acquisitionDate = latestAdd!.createdAt;
-      } else if (lineage) {
-        acquisitionType = lineage.mostRecentAuctionSeason === currentSeason ? "auction" : "keeper";
-      } else {
-        acquisitionType = "undrafted";
-      }
-
-      lineages.set(playerId, {
-        contractStartSeason: lineage?.contractStartSeason ?? currentSeason,
-        originalDraftOwner: lineage?.originalDraftOwner ?? null,
-        acquisitionType,
-        acquisitionDate,
-      });
+    if (transactionIsMostRecent) {
+      acquisitionType =
+        latestAdd!.type === "trade"
+          ? "trade"
+          : latestAdd!.type === "waiver"
+            ? "waiver"
+            : "free_agent";
+      acquisitionDate = latestAdd!.createdAt;
+    } else if (lineage) {
+      acquisitionType = lineage.mostRecentAuctionSeason === currentSeason ? "auction" : "keeper";
+    } else {
+      acquisitionType = "undrafted";
     }
+
+    lineages.set(playerId, {
+      contractStartSeason: lineage?.contractStartSeason ?? currentSeason,
+      originalDraftOwner: lineage?.originalDraftOwner ?? null,
+      acquisitionType,
+      acquisitionDate,
+    });
   }
 
   return lineages;

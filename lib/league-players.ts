@@ -15,7 +15,7 @@ import {
   getContractLineages,
   type ContractLineage,
 } from "./services/contractLineageService";
-import type { AcquisitionType } from "./models";
+import type { AcquisitionType, AssetRecord } from "./models";
 
 // Any currently-rostered player not found in the prior season's auction
 // (picked up via waiver/free agency since) is a $5 contract by convention.
@@ -225,6 +225,31 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       acquisitionDate: lineage?.acquisitionDate ?? null,
     };
   });
+}
+
+/**
+ * Maps a fully-computed LeaguePlayer down to AssetRecord — the stored
+ * FACTS shape lib/repositories/AssetRepository.ts persists. Completes the
+ * Asset valuation engine end-to-end: every field AssetRecord needs is now
+ * genuinely computed (contract lineage via
+ * lib/services/contractLineageService.ts, everything else already real),
+ * so this is a pure reshape, not a placeholder. No database exists yet to
+ * call AssetRepository.upsertAsset with the result — this only removes
+ * "there's nothing to feed it" as a blocker once one does.
+ */
+export function toAssetRecord(leagueId: string, player: LeaguePlayer): AssetRecord {
+  return {
+    leagueId,
+    playerId: player.nflPlayer.id,
+    currentOwnerId: player.currentOwnerId,
+    originalAuctionPrice: player.originalAuctionPrice,
+    keeperYearsRemaining: player.keeperYearsRemaining,
+    draftYear: player.draftYear,
+    contractStartSeason: player.contractStartSeason,
+    acquisitionType: player.acquisitionType,
+    acquisitionDate: player.acquisitionDate,
+    originalDraftOwner: player.originalDraftOwnerId,
+  };
 }
 
 /**

@@ -18,15 +18,13 @@ export type AcquisitionType =
  * computes them — keeperCost included, from originalAuctionPrice and
  * keeperYearsRemaining below.
  *
- * NOT yet populated by the live compute path (lib/league-players.ts) —
- * that still only carries draftYear, and only ever one season back. Per
- * the league's real contract rules, a drafted player's salary lineage
- * traces back to whichever season they were ORIGINALLY auctioned (2023
- * at the earliest, confirmed via the season-chain draft-type audit — not
- * always "last season"). contractStartSeason/originalDraftOwner exist
- * here so Phase 5 (auction/keeper/contract ledger) has somewhere correct
- * to write that lineage once it's actually traced through auction_records
- * across multiple seasons, instead of assumed from a single season.
+ * Populated by the live compute path today via
+ * lib/league-players.ts's toAssetRecord() — lib/services/contractLineageService.ts
+ * traces contractStartSeason/originalDraftOwner/acquisitionType/acquisitionDate
+ * through the real auction-era chain (2023+) and transaction log, not
+ * assumed from a single season. No database exists yet to actually write
+ * this to, but the shape is real and ready — AssetRepository.upsertAsset
+ * just needs a caller once Postgres is provisioned.
  */
 export type AssetRecord = {
   leagueId: string;
