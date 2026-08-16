@@ -207,3 +207,28 @@ export function getCareerStatsByOwner(
 
   return statsByOwnerId;
 }
+
+/**
+ * Longest consecutive run of a given result within one already-filtered
+ * set of performances (e.g. one owner's games, or one owner's games in
+ * one season) — a shared primitive so league-wide "longest streak ever"
+ * and one manager's own longest streak don't duplicate this logic.
+ * Chronological order isn't assumed — this sorts by season/week itself.
+ */
+export function computeLongestStreak(
+  performances: OwnerWeeklyPerformance[],
+  result: "win" | "loss"
+): number {
+  const sorted = [...performances].sort((a, b) => a.season - b.season || a.week - b.week);
+  let current = 0;
+  let longest = 0;
+  for (const performance of sorted) {
+    if (performance.result === result) {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+  return longest;
+}

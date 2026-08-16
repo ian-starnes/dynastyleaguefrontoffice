@@ -4,6 +4,7 @@ import {
   Users,
   Wallet,
   ArrowLeftRight,
+  ScrollText,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -22,5 +23,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Teams", href: "/teams", icon: Users },
   { label: "Assets", href: "/assets", icon: Wallet },
   { label: "Trades", href: "/trades", icon: ArrowLeftRight },
+  { label: "History", href: "/history", icon: ScrollText },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
