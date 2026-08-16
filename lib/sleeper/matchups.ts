@@ -22,18 +22,21 @@ export async function getMatchupsForWeek(week: number): Promise<SleeperMatchup[]
 const MAX_WEEK = 18;
 
 /**
- * Every week's matchups for one league-season, fetched in parallel and
- * flattened. A week with no games yet (future/bye) returns an empty
- * array from Sleeper rather than an error, so no special-casing needed.
+ * Every week's matchups for one league-season, fetched in parallel.
+ * Deliberately kept grouped by week (not flattened) — a SleeperMatchup
+ * row has no week field of its own, only whichever endpoint URL it came
+ * from, so flattening would silently lose that association. A week with
+ * no games yet (future/bye) returns an empty array from Sleeper rather
+ * than an error, so no special-casing needed.
  */
 export async function getAllMatchupsForLeague(
   leagueId: string
-): Promise<SleeperMatchup[]> {
-  const weeks = await Promise.all(
-    Array.from({ length: MAX_WEEK }, (_, index) =>
-      getMatchupsForLeagueWeek(leagueId, index + 1)
-    )
+): Promise<{ week: number; matchups: SleeperMatchup[] }[]> {
+  return Promise.all(
+    Array.from({ length: MAX_WEEK }, async (_, index) => {
+      const week = index + 1;
+      const matchups = await getMatchupsForLeagueWeek(leagueId, week);
+      return { week, matchups };
+    })
   );
-
-  return weeks.flat();
 }

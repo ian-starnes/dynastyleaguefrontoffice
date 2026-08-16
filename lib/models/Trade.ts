@@ -10,7 +10,7 @@ export type TradeRecord = {
   rosterIdsInvolved: number[];
   /** player_id -> roster_id it moved to. */
   playersInvolved: Record<string, number>;
-  /** From Sleeper's traded_picks: which draft picks changed hands. */
+  /** From this trade transaction's own draft_picks field — which picks changed hands in THIS trade specifically. */
   picksInvolved: Array<{
     season: string;
     round: number;

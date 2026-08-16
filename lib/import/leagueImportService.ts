@@ -5,6 +5,9 @@ import {
   getDraftsForLeague,
   getDraftPicks,
   getAllTransactionsForLeague,
+  getAllMatchupsForLeague,
+  getWinnersBracketForLeague,
+  getLosersBracketForLeague,
 } from "@/lib/sleeper";
 import {
   LeagueRepository,
@@ -13,6 +16,9 @@ import {
   TransactionRepository,
   AuctionRecordRepository,
   TradeRepository,
+  WeeklyPerformanceRepository,
+  KeeperDeclarationRepository,
+  PlayoffResultRepository,
 } from "@/lib/repositories";
 import {
   normalizeOwner,
@@ -20,6 +26,9 @@ import {
   normalizeTransaction,
   normalizeAuctionRecord,
   normalizeTrade,
+  normalizeWeekMatchups,
+  normalizeKeeperDeclarations,
+  normalizePlayoffResults,
 } from "./normalizer";
 
 export type ImportSummary = {
@@ -29,6 +38,9 @@ export type ImportSummary = {
   transactionsWritten: number;
   auctionRecordsWritten: number;
   tradesWritten: number;
+  weeklyPerformancesWritten: number;
+  keeperDeclarationsWritten: number;
+  playoffResultsWritten: number;
 };
 
 /**
@@ -52,6 +64,9 @@ export async function importLeague(
   const transactionRepository = new TransactionRepository();
   const auctionRecordRepository = new AuctionRecordRepository();
   const tradeRepository = new TradeRepository();
+  const weeklyPerformanceRepository = new WeeklyPerformanceRepository();
+  const keeperDeclarationRepository = new KeeperDeclarationRepository();
+  const playoffResultRepository = new PlayoffResultRepository();
 
   onProgress("Walking Sleeper's season chain from the root league...");
   const seasonChain = await getLeagueSeasonChain(rootLeagueId);
@@ -64,10 +79,14 @@ export async function importLeague(
   let transactionsWritten = 0;
   let auctionRecordsWritten = 0;
   let tradesWritten = 0;
+  let weeklyPerformancesWritten = 0;
+  let keeperDeclarationsWritten = 0;
+  let playoffResultsWritten = 0;
 
   for (const sleeperLeague of seasonChain) {
     const leagueId = sleeperLeague.league_id;
     const season = Number(sleeperLeague.season);
+    const isCompleteSeason = sleeperLeague.status === "complete";
     onProgress(`Season ${season} (${leagueId})...`);
 
     await leagueRepository.upsertLeague({
@@ -78,15 +97,36 @@ export async function importLeague(
       settings: sleeperLeague.settings,
     });
 
-    const [rosters, users, drafts, transactions] = await Promise.all([
-      getRostersForLeague(leagueId),
-      getOwnersForLeague(leagueId),
-      getDraftsForLeague(leagueId),
-      getAllTransactionsForLeague(leagueId).catch((error: unknown) => {
-        console.error(`Transactions fetch failed for season ${season}:`, error);
-        return [];
-      }),
-    ]);
+    // Playoff brackets only exist once a season has actually run its
+    // playoffs — an in-progress or pre_draft season's bracket endpoints
+    // return empty arrays anyway, so skip the calls entirely for a season
+    // that hasn't reached them rather than write meaningless placement rows.
+    const [rosters, users, drafts, transactions, weeks, winnersBracket, losersBracket] =
+      await Promise.all([
+        getRostersForLeague(leagueId),
+        getOwnersForLeague(leagueId),
+        getDraftsForLeague(leagueId),
+        getAllTransactionsForLeague(leagueId).catch((error: unknown) => {
+          console.error(`Transactions fetch failed for season ${season}:`, error);
+          return [];
+        }),
+        getAllMatchupsForLeague(leagueId).catch((error: unknown) => {
+          console.error(`Matchups fetch failed for season ${season}:`, error);
+          return [];
+        }),
+        isCompleteSeason
+          ? getWinnersBracketForLeague(leagueId).catch((error: unknown) => {
+              console.error(`Winners bracket fetch failed for season ${season}:`, error);
+              return [];
+            })
+          : Promise.resolve([]),
+        isCompleteSeason
+          ? getLosersBracketForLeague(leagueId).catch((error: unknown) => {
+              console.error(`Losers bracket fetch failed for season ${season}:`, error);
+              return [];
+            })
+          : Promise.resolve([]),
+      ]);
 
     const rosterIdToOwnerId = new Map<number, string>();
     for (const roster of rosters) {
@@ -131,8 +171,36 @@ export async function importLeague(
       }
     }
 
+    for (const { week, matchups } of weeks) {
+      if (matchups.length === 0) continue;
+      for (const performance of normalizeWeekMatchups(leagueId, season, week, matchups)) {
+        await weeklyPerformanceRepository.upsertWeeklyPerformance(performance);
+        weeklyPerformancesWritten++;
+      }
+    }
+
+    for (const declaration of normalizeKeeperDeclarations(leagueId, season, rosters)) {
+      await keeperDeclarationRepository.upsertKeeperDeclaration(declaration);
+      keeperDeclarationsWritten++;
+    }
+
+    if (isCompleteSeason) {
+      const playoffTeams = Number(sleeperLeague.settings.playoff_teams ?? 6);
+      for (const result of normalizePlayoffResults(
+        leagueId,
+        season,
+        winnersBracket,
+        losersBracket,
+        playoffTeams
+      )) {
+        await playoffResultRepository.upsertPlayoffResult(result);
+        playoffResultsWritten++;
+      }
+    }
+
     onProgress(
-      `  -> ${rosters.length} teams, ${users.length} owners, ${transactions.length} transactions`
+      `  -> ${rosters.length} teams, ${users.length} owners, ${transactions.length} transactions, ` +
+        `${weeks.reduce((sum, w) => sum + w.matchups.length, 0)} matchup-rosters`
     );
   }
 
@@ -143,5 +211,8 @@ export async function importLeague(
     transactionsWritten,
     auctionRecordsWritten,
     tradesWritten,
+    weeklyPerformancesWritten,
+    keeperDeclarationsWritten,
+    playoffResultsWritten,
   };
 }
