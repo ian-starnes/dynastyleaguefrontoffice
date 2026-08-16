@@ -1,7 +1,10 @@
 export type { League } from "./League";
 export type { Owner } from "./Owner";
 export type { Team } from "./Team";
-export type { AssetRecord, Asset } from "./Asset";
+export type { AssetRecord, Asset, AcquisitionType } from "./Asset";
 export type { TransactionRecord, TransactionType } from "./Transaction";
 export type { AuctionRecord } from "./AuctionRecord";
 export type { TradeRecord } from "./Trade";
+export type { WeeklyPerformance } from "./WeeklyPerformance";
+export type { KeeperDeclaration } from "./KeeperDeclaration";
+export type { PlayoffResult } from "./PlayoffResult";

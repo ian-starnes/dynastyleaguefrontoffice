@@ -5,4 +5,7 @@ export { AssetRepository } from "./AssetRepository";
 export { TransactionRepository } from "./TransactionRepository";
 export { AuctionRecordRepository } from "./AuctionRecordRepository";
 export { TradeRepository } from "./TradeRepository";
+export { WeeklyPerformanceRepository } from "./WeeklyPerformanceRepository";
+export { KeeperDeclarationRepository } from "./KeeperDeclarationRepository";
+export { PlayoffResultRepository } from "./PlayoffResultRepository";
 export { getLedger, type LedgerEntry } from "./Ledger";

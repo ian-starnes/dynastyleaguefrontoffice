@@ -15,3 +15,14 @@ export {
   getDraftPicks,
   getTradedPicksForLeague,
 } from "./drafts";
+export {
+  getMatchupsForWeek,
+  getMatchupsForLeagueWeek,
+  getAllMatchupsForLeague,
+} from "./matchups";
+export {
+  getWinnersBracket,
+  getWinnersBracketForLeague,
+  getLosersBracket,
+  getLosersBracketForLeague,
+} from "./brackets";
