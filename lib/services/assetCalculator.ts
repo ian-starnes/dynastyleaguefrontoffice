@@ -75,3 +75,50 @@ export function calculateAssetEconomics({
 
   return { marketValue, keeperCost, keeperSurplus, assetValue };
 }
+
+export type MultiYearProjection = {
+  /** Total surplus capturable over the projected years — assumes market value holds flat and a rational team stops keeping once keeper cost would exceed it. */
+  cumulativeSurplus: number;
+  /** How many of the requested years were actually worth keeping through; may be less than yearsToProject. */
+  yearsCapturable: number;
+};
+
+/**
+ * Projects cumulative Keeper Surplus over multiple future seasons — the
+ * basis for Trade Center's "multi-year franchise impact" evaluation
+ * (DLFO brief section 7). A trade does NOT change Market Value or
+ * Keeper Cost the instant it happens — both are already fixed facts —
+ * so a same-day Asset Value comparison between the current and
+ * acquiring owner would always show zero difference. The real thing a
+ * trade changes is the RESET of years remaining for the acquiring team
+ * (see keeperClockService.ts's trade-breaks-continuity rule); this
+ * projects what that reset is actually worth in capturable surplus.
+ *
+ * Explicit simplifying assumption, stated plainly rather than hidden:
+ * marketValue is assumed to hold flat across the projection window —
+ * there's no reliable way to forecast a real player's future dynasty
+ * value, so holding it constant is the only honest baseline available.
+ * keeperCost grows by the real $5/year league rule. Stops accumulating
+ * once projected keeperCost would meet or exceed marketValue (a
+ * rational GM releases the player rather than keep at a loss), which is
+ * why yearsCapturable can come back lower than yearsToProject.
+ */
+export function projectMultiYearSurplus(
+  marketValue: number,
+  currentKeeperCost: number,
+  yearsToProject: number
+): MultiYearProjection {
+  let cumulativeSurplus = 0;
+  let yearsCapturable = 0;
+
+  for (let yearOffset = 0; yearOffset < yearsToProject; yearOffset++) {
+    const projectedKeeperCost =
+      currentKeeperCost + KEEPER_INFLATION_PER_YEAR * yearOffset;
+    const projectedSurplus = marketValue - projectedKeeperCost;
+    if (projectedSurplus <= 0) break;
+    cumulativeSurplus += projectedSurplus;
+    yearsCapturable++;
+  }
+
+  return { cumulativeSurplus, yearsCapturable };
+}
