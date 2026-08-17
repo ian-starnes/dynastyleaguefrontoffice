@@ -1,6 +1,6 @@
 import { getLeaguePlayers, type LeaguePlayer } from "@/lib/league-players";
 import { getRosters, getOwners } from "@/lib/sleeper";
-import { getFuturePicks } from "./futurePicksService";
+import { getProjectedAuctionBudgets } from "./futurePicksService";
 
 export type FranchiseValuation = {
   ownerId: string;
@@ -37,11 +37,11 @@ export class FranchiseValueService {
    * reusable core this whole service (and future ones) builds on.
    */
   async getFranchiseValuations(): Promise<FranchiseValuation[]> {
-    const [players, rosters, owners, futurePicks] = await Promise.all([
+    const [players, rosters, owners, projectedBudgets] = await Promise.all([
       getLeaguePlayers(),
       getRosters(),
       getOwners(),
-      getFuturePicks(),
+      getProjectedAuctionBudgets(),
     ]);
 
     const ownerNameByUserId = new Map(
@@ -49,9 +49,6 @@ export class FranchiseValueService {
         owner.user_id,
         owner.metadata?.team_name ?? owner.display_name,
       ])
-    );
-    const ownerIdByRosterId = new Map(
-      rosters.map((roster) => [roster.roster_id, roster.owner_id])
     );
 
     // Total Roster Asset Value: sum of every rostered player's Asset
@@ -66,15 +63,16 @@ export class FranchiseValueService {
       );
     }
 
-    // Total Future Pick Value: sum of pick values, grouped by whichever
-    // owner currently holds each pick (after trades).
+    // Total Future Pick Value: each projected season defaults to the
+    // standard $200 auction budget per owner, adjusted only by real
+    // traded-round credits (see getProjectedAuctionBudgets) — not a sum
+    // of currently-held pick credits, which would undercount by half
+    // for anyone who hasn't traded anything.
     const futurePickValueByOwnerId = new Map<string, number>();
-    for (const pick of futurePicks) {
-      const ownerId = ownerIdByRosterId.get(pick.currentOwnerRosterId);
-      if (!ownerId) continue;
+    for (const budget of projectedBudgets) {
       futurePickValueByOwnerId.set(
-        ownerId,
-        (futurePickValueByOwnerId.get(ownerId) ?? 0) + pick.value
+        budget.ownerId,
+        (futurePickValueByOwnerId.get(budget.ownerId) ?? 0) + budget.budget
       );
     }
 

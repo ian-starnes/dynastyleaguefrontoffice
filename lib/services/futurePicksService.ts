@@ -82,3 +82,62 @@ export async function getFuturePicks(): Promise<FuturePick[]> {
 
   return picks;
 }
+
+export type ProjectedAuctionBudget = {
+  season: number;
+  ownerId: string;
+  /** $200 standard auction budget, adjusted only by real traded-round credits gained or given up for this season. */
+  budget: number;
+};
+
+/**
+ * A team's full draft-day auction budget for a projected season defaults
+ * to the league's standard $200 — that's what "all rounds rostered"
+ * (i.e., nothing traded away) is worth, since Appendix A's 15 rows sum
+ * to exactly $200 by construction. This league's real draft only has
+ * draft_rounds (3) actual tradeable rounds, so the $200 baseline already
+ * bakes in the untradeable remainder (rounds 4-15) as a fixed
+ * entitlement — trades can only move the REAL rounds (1-3), and each
+ * one adjusts both sides' budget by that round's Appendix A credit:
+ * the team that traded a pick away loses its credit, whoever acquired
+ * it gains the same credit. Net effect across the whole league is
+ * always zero, so total budget league-wide is always
+ * numTeams * $200 for any given season, regardless of how much trading
+ * happened.
+ */
+const STANDARD_AUCTION_BUDGET = 200;
+
+export async function getProjectedAuctionBudgets(): Promise<ProjectedAuctionBudget[]> {
+  const [picks, rosters] = await Promise.all([getFuturePicks(), getRosters()]);
+
+  const ownerIdByRosterId = new Map(
+    rosters.filter((r) => r.owner_id).map((r) => [r.roster_id, r.owner_id as string])
+  );
+
+  const netAdjustmentByKey = new Map<string, number>();
+  function adjust(season: number, ownerId: string, delta: number) {
+    const key = `${season}:${ownerId}`;
+    netAdjustmentByKey.set(key, (netAdjustmentByKey.get(key) ?? 0) + delta);
+  }
+
+  for (const pick of picks) {
+    if (pick.originalRosterId === pick.currentOwnerRosterId) continue; // untraded — no adjustment
+
+    const originalOwnerId = ownerIdByRosterId.get(pick.originalRosterId);
+    const currentOwnerId = ownerIdByRosterId.get(pick.currentOwnerRosterId);
+    if (originalOwnerId) adjust(pick.season, originalOwnerId, -pick.value);
+    if (currentOwnerId) adjust(pick.season, currentOwnerId, pick.value);
+  }
+
+  const seasons = [...new Set(picks.map((p) => p.season))];
+  const ownerIds = [...ownerIdByRosterId.values()];
+
+  const budgets: ProjectedAuctionBudget[] = [];
+  for (const season of seasons) {
+    for (const ownerId of ownerIds) {
+      const adjustment = netAdjustmentByKey.get(`${season}:${ownerId}`) ?? 0;
+      budgets.push({ season, ownerId, budget: STANDARD_AUCTION_BUDGET + adjustment });
+    }
+  }
+  return budgets;
+}

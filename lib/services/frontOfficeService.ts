@@ -1,7 +1,7 @@
 import { getLeague, getAllTransactions, getOwners, getRosters } from "@/lib/sleeper";
 import { getLeaguePlayers, type LeaguePlayer } from "@/lib/league-players";
 import { FranchiseValueService } from "./franchiseValueService";
-import { getFuturePicks } from "./futurePicksService";
+import { getProjectedAuctionBudgets } from "./futurePicksService";
 import { getAllWeeklyPerformances } from "./weeklyPerformanceService";
 import { getSeasonStandings } from "./seasonStandingsService";
 
@@ -39,12 +39,12 @@ export type FrontOfficeSummary = {
 export async function getFrontOfficeSummary(
   ownerId: string
 ): Promise<FrontOfficeSummary | null> {
-  const [league, players, valuations, futurePicks, performances, currentTransactions, owners, rosters] =
+  const [league, players, valuations, projectedBudgets, performances, currentTransactions, owners, rosters] =
     await Promise.all([
       getLeague(),
       getLeaguePlayers(),
       new FranchiseValueService().getFranchiseValuations(),
-      getFuturePicks(),
+      getProjectedAuctionBudgets(),
       getAllWeeklyPerformances(),
       getAllTransactions().catch((error: unknown) => {
         console.error("Current-season transactions fetch failed for Front Office:", error);
@@ -80,15 +80,16 @@ export async function getFrontOfficeSummary(
     .sort((a, b) => (b.assetValue ?? 0) - (a.assetValue ?? 0))
     .slice(0, 5);
 
+  const myBudgetBySeason = new Map(
+    projectedBudgets.filter((b) => b.ownerId === ownerId).map((b) => [b.season, b.budget])
+  );
   const projectedAuctionBudgetBySeason = [
     currentSeason + 1,
     currentSeason + 2,
     currentSeason + 3,
   ].map((season) => ({
     season,
-    value: futurePicks
-      .filter((p) => p.season === season && p.currentOwnerRosterId === myRosterId)
-      .reduce((sum, p) => sum + p.value, 0),
+    value: myBudgetBySeason.get(season) ?? 0,
   }));
 
   const ownerNameByOwnerId = new Map(
