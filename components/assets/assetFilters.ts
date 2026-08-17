@@ -11,6 +11,7 @@ export type AssetFilterId =
   | "owned"
   | "free-agent"
   | "my-team"
+  | "expiring"
   | `${typeof OWNER_FILTER_PREFIX}${string}`;
 
 export const ASSET_FILTERS: { id: AssetFilterId; label: string }[] = [
@@ -22,6 +23,7 @@ export const ASSET_FILTERS: { id: AssetFilterId; label: string }[] = [
   { id: "owned", label: "Owned" },
   { id: "free-agent", label: "Free Agent" },
   { id: "my-team", label: "My Team" },
+  { id: "expiring", label: "Expiring" },
 ];
 
 export function ownerFilterId(ownerId: string): AssetFilterId {
@@ -58,6 +60,9 @@ export function matchesAssetFilter(
       return player.currentOwnerId === null;
     case "my-team":
       return myOwnerId !== null && player.currentOwnerId === myOwnerId;
+    case "expiring":
+      // Contract's last keeper year — expires (returns to the draft pool) after this season.
+      return player.currentOwnerId !== null && player.keeperYearsRemaining <= 1;
     default:
       return false;
   }
