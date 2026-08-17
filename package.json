@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "node scripts/migrate.mjs",
-    "import:league": "tsx scripts/import-league.ts"
+    "import:league": "tsx --env-file=.env.local scripts/import-league.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

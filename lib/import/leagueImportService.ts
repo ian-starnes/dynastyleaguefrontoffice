@@ -128,6 +128,14 @@ export async function importLeague(
           : Promise.resolve([]),
       ]);
 
+    // Owners must be written before teams — teams.owner_id has a foreign
+    // key into owners(owner_id), so a team referencing an owner that
+    // doesn't exist yet fails the constraint.
+    for (const user of users) {
+      await ownerRepository.upsertOwner(normalizeOwner(user));
+      ownersWritten++;
+    }
+
     const rosterIdToOwnerId = new Map<number, string>();
     for (const roster of rosters) {
       await teamRepository.upsertTeam(normalizeTeam(leagueId, roster));
@@ -135,11 +143,6 @@ export async function importLeague(
       if (roster.owner_id) {
         rosterIdToOwnerId.set(roster.roster_id, roster.owner_id);
       }
-    }
-
-    for (const user of users) {
-      await ownerRepository.upsertOwner(normalizeOwner(user));
-      ownersWritten++;
     }
 
     // Auction/keeper history — only meaningful for a completed auction-type
