@@ -181,7 +181,16 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     const realAuctionPrice = priorSeasonAuctionData?.pricesByPlayerId.get(
       nflPlayer.id
     );
-    const originalAuctionPrice = realAuctionPrice ?? UNDRAFTED_CONTRACT_PRICE;
+    // Undrafted (no real prior-season price) splits two ways: a free
+    // agent nobody currently holds has acquisition value $0 — there's no
+    // keeper decision to price, since no one is keeping them. Only a
+    // ROSTERED undrafted player (a waiver/free-agent pickup someone is
+    // actually holding onto) becomes a $5 contract, and even then only
+    // once a real keeper decision is made at the next draft — this is a
+    // live, forward-looking projection of what THAT would cost, not a
+    // claim it's already happened.
+    const originalAuctionPrice =
+      realAuctionPrice ?? (ownerId !== null ? UNDRAFTED_CONTRACT_PRICE : 0);
     // Real prices come from exactly one season back (priorSeason); the $5
     // undrafted convention is a fresh, as-of-now price (currentSeason) —
     // so yearsSincePriceSet is 1 for the former, 0 for the latter.
