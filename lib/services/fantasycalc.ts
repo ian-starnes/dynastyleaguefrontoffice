@@ -1,7 +1,7 @@
-// FantasyCalc's dynasty market values are scoped to a league format (team
-// count, QB slots, PPR). Hardcoded to match this league for now — once
-// DLFO supports multiple leagues these need to come from each league's
-// actual Sleeper settings instead.
+// FantasyCalc's market values are scoped to a league format (team count,
+// QB slots, PPR). Hardcoded to match this league for now — once DLFO
+// supports multiple leagues these need to come from each league's actual
+// Sleeper settings instead.
 const FANTASYCALC_API_URL = "https://api.fantasycalc.com/values/current";
 const LEAGUE_NUM_TEAMS = 10;
 const LEAGUE_NUM_QBS = 1;
@@ -16,6 +16,16 @@ type FantasyCalcApiEntry = {
     maybeTeam?: string | null;
   };
   value: number;
+  /**
+   * Confirmed live (by comparing the same player's response under both
+   * isDynasty=true and isDynasty=false) that this field is always
+   * present and always the same number regardless of the isDynasty
+   * query flag — it's FantasyCalc's dedicated current-season/"rest of
+   * season" value, distinct from `value` (which shifts with context).
+   * This is what Market Value reads, per the user's explicit choice not
+   * to use dynasty value.
+   */
+  redraftValue: number;
   trend30Day: number;
 };
 
@@ -25,6 +35,7 @@ export type FantasyCalcPlayer = {
   sleeperId: string | null;
   position: string;
   team: string | null;
+  /** FantasyCalc's redraft/"rest of season" value — not dynasty value. */
   value: number;
   /** Real 30-day value change from FantasyCalc — not a full history, just the trend. */
   trend30Day: number;
@@ -48,7 +59,9 @@ export function normalizePlayerName(name: string): string {
 }
 
 async function fetchFantasyCalcEntries(): Promise<FantasyCalcApiEntry[]> {
-  const url = `${FANTASYCALC_API_URL}?isDynasty=true&numQbs=${LEAGUE_NUM_QBS}&numTeams=${LEAGUE_NUM_TEAMS}&ppr=${LEAGUE_PPR}`;
+  // isDynasty=false, per the user's explicit choice to value players on
+  // this-season/"rest of season" outlook, not long-term dynasty value.
+  const url = `${FANTASYCALC_API_URL}?isDynasty=false&numQbs=${LEAGUE_NUM_QBS}&numTeams=${LEAGUE_NUM_TEAMS}&ppr=${LEAGUE_PPR}`;
 
   const response = await fetch(url, { next: { revalidate: 3600 } });
 
@@ -62,10 +75,11 @@ async function fetchFantasyCalcEntries(): Promise<FantasyCalcApiEntry[]> {
 }
 
 /**
- * Fetches current FantasyCalc dynasty market values and indexes them for
- * lookup by either Sleeper player ID or normalized player name — whichever
- * a caller has on hand. Both key types share one map safely: Sleeper IDs
- * are numeric strings, normalized names never are, so they can't collide.
+ * Fetches current FantasyCalc redraft ("rest of season") market values
+ * and indexes them for lookup by either Sleeper player ID or normalized
+ * player name — whichever a caller has on hand. Both key types share one
+ * map safely: Sleeper IDs are numeric strings, normalized names never
+ * are, so they can't collide.
  *
  * (Two real players sharing a normalized name would collide on that key —
  * an accepted, rare edge case for the name-only fallback path; the Sleeper
@@ -84,7 +98,7 @@ export async function getFantasyCalcValues(): Promise<
       sleeperId: entry.player.sleeperId ?? null,
       position: entry.player.position,
       team: entry.player.maybeTeam ?? null,
-      value: entry.value,
+      value: entry.redraftValue,
       trend30Day: entry.trend30Day,
     };
 

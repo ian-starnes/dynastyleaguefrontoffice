@@ -40,7 +40,9 @@ export type LeaguePlayer = {
   currentOwnerName: string | null;
 
   /**
-   * Raw FantasyCalc dynasty value, in FantasyCalc points — not dollars.
+   * Raw FantasyCalc redraft ("rest of season") value, in FantasyCalc
+   * points — not dollars, and not dynasty value (the user chose current-
+   * season outlook over long-term dynasty value for Market Value).
    * No longer DLFO's primary valuation metric; kept in the data model as
    * the input to marketValue, but hidden from the default table view.
    * Null if unmatched — never faked.
