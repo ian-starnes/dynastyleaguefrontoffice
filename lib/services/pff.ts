@@ -1,6 +1,8 @@
 /**
  * PFF (Pro Football Focus) grades — a planned future input to Market
- * Value (see lib/services/marketValueService.ts's TODO(market-value-model)).
+ * Value's Component C (see lib/services/rosValuationService.ts and
+ * lib/services/rosConsensusService.ts, DLFO's actual Market Value source
+ * today).
  *
  * Researched before writing this stub: PFF does not appear to publish a
  * public, documented API for fantasy grades. What exists (pff.dev,

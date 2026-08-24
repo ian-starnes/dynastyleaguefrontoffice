@@ -1,5 +1,3 @@
-import { convertFantasyCalcToMarketValue } from "./marketValueService";
-
 const KEEPER_INFLATION_PER_YEAR = 5;
 
 /**
@@ -11,8 +9,14 @@ const KEEPER_INFLATION_PER_YEAR = 5;
 export const MAX_KEEPER_YEARS = 5;
 
 export type AssetCalculatorInput = {
-  /** Raw FantasyCalc points, live from lib/services/fantasycalc.ts. Null if unmatched. */
-  fantasyCalc: number | null;
+  /**
+   * Live market value in real auction dollars — from the ROS valuation
+   * engine (lib/services/rosValuationService.ts) today. Already a dollar
+   * figure, not points, so no conversion happens in here; null if no
+   * valuation exists for this player (e.g. a rookie with zero recorded
+   * games yet — see rosValuationService.ts's documented Component C gap).
+   */
+  marketValue: number | null;
   /** Stored fact — what the asset actually sold for, as of yearsSincePriceSet seasons ago. */
   originalAuctionPrice: number;
   /**
@@ -37,7 +41,7 @@ export type AssetEconomics = {
 
 /**
  * The ONLY place Market Value, Keeper Cost, Keeper Surplus, and Asset
- * Value get computed. Every caller — the live Sleeper/FantasyCalc path in
+ * Value get computed. Every caller — the live ROS-valuation-engine path in
  * lib/league-players.ts today, and the database-backed path once
  * lib/repositories/AssetRepository.ts is wired to real Postgres facts —
  * goes through this function so the formulas can never drift out of sync
@@ -53,22 +57,16 @@ export type AssetEconomics = {
  * inside it.
  */
 export function calculateAssetEconomics({
-  fantasyCalc,
+  marketValue,
   originalAuctionPrice,
   yearsSincePriceSet,
 }: AssetCalculatorInput): AssetEconomics {
-  const marketValue =
-    fantasyCalc !== null ? convertFantasyCalcToMarketValue(fantasyCalc) : null;
-
   // Keeper Cost is determined exclusively by league history —
   // originalAuctionPrice plus $5 for every offseason since that price was
-  // set. Never derived from fantasyCalc/marketValue.
+  // set. Never derived from marketValue.
   const keeperCost =
     originalAuctionPrice + KEEPER_INFLATION_PER_YEAR * yearsSincePriceSet;
 
-  // TODO(auction-value): once real Market AUCTION Value exists (as opposed
-  // to this estimated market value), swap it in here — marketValue is a
-  // stand-in until then.
   const keeperSurplus = marketValue !== null ? marketValue - keeperCost : null;
   const assetValue =
     marketValue !== null ? marketValue + (keeperSurplus as number) : null;

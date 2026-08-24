@@ -40,11 +40,6 @@ function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
  * instead of navigating away. Called from AssetsExplorer via useMemo,
  * keyed on the (also memoized) callbacks, so the returned array stays
  * referentially stable across re-renders.
- *
- * Deliberately no "FantasyCalc" column here — it's hidden by default per
- * the valuation pivot (it's an input to Market Value now, not the value
- * itself). The field still lives on LeaguePlayer (row.fantasyCalc) for
- * anyone who needs it later; this is just where it's excluded from view.
  */
 export function createAssetColumns({
   onOwnerClick,

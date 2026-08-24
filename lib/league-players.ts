@@ -1,11 +1,12 @@
 import { getPlayers, getRosters, getOwners, type NFLPlayer } from "./sleeper";
-import {
-  getFantasyCalcValues,
-  normalizePlayerName,
-  type FantasyCalcPlayer,
-} from "./services/fantasycalc";
+import { normalizePlayerName } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
 import { calculateAssetEconomics, MAX_KEEPER_YEARS } from "./services/assetCalculator";
+import {
+  buildROSValuationContext,
+  calculateAllROSAuctionValues,
+  type ROSValuation,
+} from "./services/rosValuationService";
 import {
   getPriorSeasonAuctionData,
   type PriorSeasonAuctionData,
@@ -28,8 +29,10 @@ const UNDRAFTED_CONTRACT_PRICE = 5;
  * three combined.
  *
  * Every economic field here is in auction dollars ($) — the currency
- * used at the real draft table — not FantasyCalc points. FantasyCalc is
- * an input to marketValue, not the value itself. marketValue, keeperCost,
+ * used at the real draft table. marketValue comes from the live ROS
+ * (rest-of-season) valuation engine (lib/services/rosValuationService.ts),
+ * which derives it from real Sleeper production data and this league's
+ * real auction economy, not FantasyCalc. marketValue, keeperCost,
  * keeperSurplus, and assetValue are all computed exclusively by
  * lib/services/assetCalculator.ts — nothing else in the codebase does
  * that arithmetic.
@@ -40,18 +43,11 @@ export type LeaguePlayer = {
   currentOwnerName: string | null;
 
   /**
-   * Raw FantasyCalc redraft ("rest of season") value, in FantasyCalc
-   * points — not dollars, and not dynasty value (the user chose current-
-   * season outlook over long-term dynasty value for Market Value).
-   * No longer DLFO's primary valuation metric; kept in the data model as
-   * the input to marketValue, but hidden from the default table view.
-   * Null if unmatched — never faked.
+   * Auction market value, in dollars, from the live ROS valuation engine.
+   * Null when the engine has no real valuation for this player — e.g. a
+   * rookie with zero recorded games yet, since the engine is stats-driven
+   * and never fabricates a projection (see rosValuationService.ts).
    */
-  fantasyCalc: number | null;
-  /** Real 30-day point change from FantasyCalc; null if unmatched. */
-  fantasyCalcTrend30Day: number | null;
-
-  /** Estimated auction market value, in dollars. See assetCalculator.ts. */
   marketValue: number | null;
 
   /**
@@ -103,24 +99,34 @@ export type LeaguePlayer = {
  * today, only) place an NFLPlayer becomes a LeaguePlayer.
  */
 export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
+  // Fetched up front, once, and passed into buildROSValuationContext below
+  // rather than let it fetch its own copy — Sleeper's /players/nfl payload
+  // is ~19MB, too large for Next's data cache, so every extra call is a
+  // real, uncached network re-fetch, not a free cache hit.
+  const players = await getPlayers();
+
   const [
-    [players, rosters, owners],
-    fantasyCalcValues,
+    [rosters, owners],
+    rosAuctionValues,
     fantasyProsValues,
     priorSeasonAuctionData,
     keeperClocks,
     contractLineages,
   ] = await Promise.all([
-    Promise.all([getPlayers(), getRosters(), getOwners()]),
-    // FantasyCalc is supplementary, not essential — if it's unreachable,
-    // every player just shows "—" instead of taking down the whole page.
-    getFantasyCalcValues().catch((error: unknown) => {
-      console.error(
-        "FantasyCalc fetch failed, showing — for all players:",
-        error
-      );
-      return new Map<string, FantasyCalcPlayer>();
-    }),
+    Promise.all([getRosters(), getOwners()]),
+    // The ROS valuation engine is supplementary, not essential — if a
+    // real Sleeper stats fetch inside it fails, every player just shows
+    // "—" for Market Value instead of taking down the whole page. Same
+    // resilience pattern as every other optional source below.
+    buildROSValuationContext(players)
+      .then((context) => calculateAllROSAuctionValues(context))
+      .catch((error: unknown) => {
+        console.error(
+          "ROS valuation engine failed, showing — Market Value for all players:",
+          error
+        );
+        return new Map<string, ROSValuation>();
+      }),
     // Stubbed until a licensed FantasyPros key exists — resolves to an
     // empty map today, so every match below is a no-op (null).
     getFantasyProsValues(),
@@ -167,15 +173,15 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
   return players.map((nflPlayer) => {
     const ownerId = ownerIdByPlayerId.get(nflPlayer.id) ?? null;
 
-    const fantasyCalcMatch =
-      fantasyCalcValues.get(nflPlayer.id) ??
-      fantasyCalcValues.get(normalizePlayerName(nflPlayer.fullName));
-
     const fantasyProsMatch =
       fantasyProsValues.get(nflPlayer.id) ??
       fantasyProsValues.get(normalizePlayerName(nflPlayer.fullName));
 
-    const fantasyCalc = fantasyCalcMatch?.value ?? null;
+    // Keyed directly by Sleeper player_id — no name-normalization fallback
+    // needed, since the ROS engine's own player pool comes from the same
+    // getPlayers() call this file uses.
+    const rosValuation = rosAuctionValues.get(nflPlayer.id);
+    const marketValueInput = rosValuation?.auctionValue ?? null;
 
     const priorSeason = priorSeasonAuctionData?.season ?? 2025;
     const currentSeason = priorSeason + 1;
@@ -204,7 +210,7 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
 
     const { marketValue, keeperCost, keeperSurplus, assetValue } =
       calculateAssetEconomics({
-        fantasyCalc,
+        marketValue: marketValueInput,
         originalAuctionPrice,
         yearsSincePriceSet,
       });
@@ -217,8 +223,6 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
       currentOwnerName: ownerId
         ? ownerNameByUserId.get(ownerId) ?? null
         : null,
-      fantasyCalc,
-      fantasyCalcTrend30Day: fantasyCalcMatch?.trend30Day ?? null,
       marketValue,
       fantasyProsECR: fantasyProsMatch?.ecr ?? null,
       originalAuctionPrice,
@@ -266,8 +270,8 @@ export function toAssetRecord(leagueId: string, player: LeaguePlayer): AssetReco
 /**
  * Single-player lookup for the profile page/drawer. Thin wrapper around
  * getLeaguePlayers() rather than a separate fetch path — Next's fetch
- * cache already dedupes the underlying Sleeper/FantasyCalc requests, so
- * this isn't a wasted refetch of ~1000 players just to show one.
+ * cache already dedupes the underlying Sleeper requests, so this isn't a
+ * wasted refetch of ~1000 players just to show one.
  */
 export async function getLeaguePlayer(
   playerId: string

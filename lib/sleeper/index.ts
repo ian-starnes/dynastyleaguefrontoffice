@@ -26,3 +26,10 @@ export {
   getLosersBracket,
   getLosersBracketForLeague,
 } from "./brackets";
+export {
+  getWeeklyStats,
+  getNflState,
+  type SleeperWeeklyStat,
+  type SleeperWeeklyStatsMap,
+  type SleeperNflState,
+} from "./stats";

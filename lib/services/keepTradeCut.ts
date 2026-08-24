@@ -1,7 +1,8 @@
 /**
  * KeepTradeCut's crowdsourced dynasty values — marked optional in the
- * DLFO architecture brief. A possible future input to Market Value (see
- * lib/services/marketValueService.ts's TODO(market-value-model)).
+ * DLFO architecture brief. A possible future input to Market Value's
+ * Component C (see lib/services/rosValuationService.ts, DLFO's actual
+ * Market Value source today).
  *
  * Researched before writing this stub: KeepTradeCut is a free, crowdsourced
  * web tool (keeptradecut.com) — no documented public API found. Same

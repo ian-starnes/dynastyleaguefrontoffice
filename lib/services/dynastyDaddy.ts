@@ -1,6 +1,7 @@
 /**
- * Dynasty Daddy's trade values — a planned future input to Market Value
- * (see lib/services/marketValueService.ts's TODO(market-value-model)).
+ * Dynasty Daddy's trade values — a planned future input to Market Value's
+ * Component C (see lib/services/rosValuationService.ts, DLFO's actual
+ * Market Value source today).
  *
  * Researched before writing this stub: Dynasty Daddy's trade values are a
  * web tool (dynasty-daddy.com), not a documented public API. No confirmed
