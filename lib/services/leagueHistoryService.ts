@@ -99,9 +99,18 @@ export function computeHeadToHead(
     let careerPointsFor = 0;
     let careerPointsAgainst = 0;
 
+    // Games flagged resultManuallyCorrected (see historicalResultCorrections.ts)
+    // have a real, honest win/loss outcome but NOT a real corresponding
+    // score — the winner is confirmed, no corrected score was ever
+    // fabricated to match. Every margin-derived figure below (average
+    // margin, biggest win/loss) has to skip those rows, or a "win" that
+    // still shows the opponent's real, higher score turns into a
+    // nonsensical negative "blowout." Win/loss counts and points for/
+    // against are unaffected — those are correct either way.
+    let marginSampleCount = 0;
+
     for (const game of sorted) {
       const margin = game.teamScore - game.opponentScore!;
-      marginSum += margin;
       careerPointsFor += game.teamScore;
       careerPointsAgainst += game.opponentScore!;
 
@@ -112,20 +121,30 @@ export function computeHeadToHead(
         ownerAWins++;
         if (isPlayoff) playoffAWins++;
         else regularAWins++;
-        if (!biggestWin || margin > biggestWin.margin) {
-          biggestWin = { season: game.season, week: game.week, margin };
+        if (!game.resultManuallyCorrected) {
+          marginSum += margin;
+          marginSampleCount++;
+          if (!biggestWin || margin > biggestWin.margin) {
+            biggestWin = { season: game.season, week: game.week, margin };
+          }
         }
       } else if (game.result === "loss") {
         ownerBWins++;
         if (isPlayoff) playoffBWins++;
         else regularBWins++;
-        if (!biggestLoss || margin < biggestLoss.margin) {
-          biggestLoss = { season: game.season, week: game.week, margin };
+        if (!game.resultManuallyCorrected) {
+          marginSum += margin;
+          marginSampleCount++;
+          if (!biggestLoss || margin < biggestLoss.margin) {
+            biggestLoss = { season: game.season, week: game.week, margin };
+          }
         }
       } else {
         ties++;
         if (isPlayoff) playoffTies++;
         else regularTies++;
+        marginSum += margin; // always 0 for a tie — harmless either way
+        marginSampleCount++;
       }
 
       const combined = game.teamScore + game.opponentScore!;
@@ -166,7 +185,7 @@ export function computeHeadToHead(
       ties,
       regularSeason: { ownerAWins: regularAWins, ownerBWins: regularBWins, ties: regularTies },
       playoffs: { ownerAWins: playoffAWins, ownerBWins: playoffBWins, ties: playoffTies },
-      averageMargin: sorted.length > 0 ? marginSum / sorted.length : 0,
+      averageMargin: marginSampleCount > 0 ? marginSum / marginSampleCount : 0,
       biggestWin,
       biggestLoss,
       highestCombinedScore: highestCombined,
@@ -413,7 +432,11 @@ export function computeLeagueRecords(
     );
   }
 
-  const winningResults = performances.filter((p) => p.result === "win" && p.opponentScore !== null);
+  // Excludes resultManuallyCorrected rows — see the doc comment in
+  // computeHeadToHead for why a corrected win's margin can't be trusted.
+  const winningResults = performances.filter(
+    (p) => p.result === "win" && p.opponentScore !== null && !p.resultManuallyCorrected
+  );
   const largestBlowout = winningResults.reduce<OwnerWeeklyPerformance | null>(
     (biggest, p) =>
       !biggest || p.teamScore - p.opponentScore! > biggest.teamScore - biggest.opponentScore!

@@ -6,21 +6,62 @@ import {
   getSleeperLeagueId,
 } from "@/lib/sleeper";
 import { normalizeWeekMatchups } from "@/lib/import/normalizer";
+import { getFranchiseIdentityMap, canonicalizeOwnerId } from "./franchiseIdentityService";
+import { WEEKLY_RESULT_CORRECTIONS } from "@/lib/config/historicalResultCorrections";
 import type { WeeklyPerformance } from "@/lib/models";
+
+/**
+ * Applies any explicit, confirmed override from historicalResultCorrections.ts
+ * — see that file's doc comment. Only ever touches `result`; the real
+ * recorded point totals are left exactly as Sleeper reported them, since
+ * what's disputed is who won, not the scores themselves. Returns whether
+ * a correction actually applied, so callers can flag the row and keep
+ * margin-derived stats (which assume win implies the higher score) from
+ * treating it as a real blowout or nail-biter it never was.
+ */
+function applyResultCorrection(
+  performance: WeeklyPerformance
+): { performance: WeeklyPerformance; corrected: boolean } {
+  const correction = WEEKLY_RESULT_CORRECTIONS.find(
+    (c) => c.season === performance.season && c.week === performance.week
+  );
+  if (!correction) return { performance, corrected: false };
+
+  if (performance.rosterId === correction.winningRosterId) {
+    return { performance: { ...performance, result: "win" }, corrected: true };
+  }
+  if (performance.rosterId === correction.losingRosterId) {
+    return { performance: { ...performance, result: "loss" }, corrected: true };
+  }
+  return { performance, corrected: false };
+}
 
 /**
  * A WeeklyPerformance row with owner identity resolved. roster_id only
  * means anything within one league_id (one season) — Sleeper's
  * previous_league_id chain gives each season a fresh set of roster_ids,
  * so career stats across seasons have to be attributed by owner_id
- * (stable to a real Sleeper account) instead, which is exactly the
- * problem this service exists to solve.
+ * instead, which is exactly the problem this service exists to solve.
+ * ownerId is further canonicalized through franchiseIdentityService so a
+ * manager succession (same roster, new Sleeper account) doesn't fracture
+ * one franchise's career history across two different ids — see that
+ * service's doc comment for the real, confirmed case this handles.
  */
 export type OwnerWeeklyPerformance = WeeklyPerformance & {
   ownerId: string | null;
   ownerName: string | null;
   opponentOwnerId: string | null;
   opponentOwnerName: string | null;
+  /**
+   * True when historicalResultCorrections.ts overrode this game's result.
+   * The recorded teamScore/opponentScore are NOT corrected (no real
+   * corrected score exists to fabricate), so win/loss-based stats
+   * (records, streaks, championships) can trust `result` directly, but
+   * anything margin-derived (largest blowout, closest victory, biggest
+   * win/loss) must skip these rows — otherwise a "win" with a lower
+   * score than the opponent produces a nonsensical negative margin.
+   */
+  resultManuallyCorrected: boolean;
 };
 
 /**
@@ -41,7 +82,10 @@ export type OwnerWeeklyPerformance = WeeklyPerformance & {
  */
 export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance[]> {
   const rootLeagueId = getSleeperLeagueId();
-  const seasonChain = await getLeagueSeasonChain(rootLeagueId);
+  const [seasonChain, franchiseIdentity] = await Promise.all([
+    getLeagueSeasonChain(rootLeagueId),
+    getFranchiseIdentityMap(),
+  ]);
 
   const perSeason = await Promise.all(
     seasonChain.map(async (league) => {
@@ -63,11 +107,14 @@ export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance
 
       function resolveOwner(rosterId: number | null) {
         if (rosterId === null) return { ownerId: null, ownerName: null };
-        const ownerId = ownerIdByRosterId.get(rosterId) ?? null;
-        return {
-          ownerId,
-          ownerName: ownerId ? ownerNameByOwnerId.get(ownerId) ?? null : null,
-        };
+        const rawOwnerId = ownerIdByRosterId.get(rosterId) ?? null;
+        if (!rawOwnerId) return { ownerId: null, ownerName: null };
+        const ownerId = canonicalizeOwnerId(rawOwnerId, franchiseIdentity);
+        const ownerName =
+          franchiseIdentity.currentOwnerName.get(ownerId) ??
+          ownerNameByOwnerId.get(rawOwnerId) ??
+          null;
+        return { ownerId, ownerName };
       }
 
       const season = Number(league.season);
@@ -76,12 +123,13 @@ export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance
       for (const { week, matchups } of weeks) {
         if (matchups.length === 0) continue;
 
-        for (const performance of normalizeWeekMatchups(
+        for (const rawPerformance of normalizeWeekMatchups(
           league.league_id,
           season,
           week,
           matchups
         )) {
+          const { performance, corrected } = applyResultCorrection(rawPerformance);
           const owner = resolveOwner(performance.rosterId);
           const opponent = resolveOwner(performance.opponentRosterId);
 
@@ -91,6 +139,7 @@ export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance
             ownerName: owner.ownerName,
             opponentOwnerId: opponent.ownerId,
             opponentOwnerName: opponent.ownerName,
+            resultManuallyCorrected: corrected,
           });
         }
       }

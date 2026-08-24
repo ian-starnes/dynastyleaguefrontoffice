@@ -7,6 +7,7 @@ import {
   getSleeperLeagueId,
   type SleeperDraftPick,
 } from "@/lib/sleeper";
+import { getFranchiseIdentityMap, canonicalizeOwnerId } from "./franchiseIdentityService";
 import type { AcquisitionType } from "@/lib/models";
 
 export type ContractLineage = {
@@ -118,7 +119,10 @@ function traceLineage(
  */
 export async function getContractLineages(): Promise<Map<string, ContractLineage>> {
   const rootLeagueId = getSleeperLeagueId();
-  const fullChain = await getLeagueSeasonChain(rootLeagueId); // oldest first
+  const [fullChain, franchiseIdentity] = await Promise.all([
+    getLeagueSeasonChain(rootLeagueId), // oldest first
+    getFranchiseIdentityMap(),
+  ]);
   const currentSeason = Number(fullChain[fullChain.length - 1].season);
 
   const [auctionSeasonsRaw, transactionsPerSeason] = await Promise.all([
@@ -139,8 +143,17 @@ export async function getContractLineages(): Promise<Map<string, ContractLineage
           season: Number(league.season),
           concludedAt: auctionDraft.last_picked,
           picksByPlayerId: new Map(picks.map((pick) => [pick.player_id, pick])),
+          // Canonicalized so originalDraftOwner attributes to whoever
+          // currently manages the franchise, not a departed manager's
+          // account — see franchiseIdentityService.ts. Otherwise a player
+          // originally drafted under a since-succeeded manager would show
+          // a blank Original Draft Owner (their old account no longer
+          // resolves a name via the current owners list).
           ownerIdByRosterId: new Map(
-            rosters.map((roster) => [roster.roster_id, roster.owner_id])
+            rosters.map((roster) => [
+              roster.roster_id,
+              roster.owner_id ? canonicalizeOwnerId(roster.owner_id, franchiseIdentity) : null,
+            ])
           ),
         } satisfies AuctionSeason;
       })

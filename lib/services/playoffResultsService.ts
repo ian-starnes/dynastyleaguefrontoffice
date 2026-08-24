@@ -7,7 +7,16 @@ import {
   getSleeperLeagueId,
 } from "@/lib/sleeper";
 import { normalizePlayoffResults } from "@/lib/import/normalizer";
+import { getFranchiseIdentityMap, canonicalizeOwnerId } from "./franchiseIdentityService";
+import { PLAYOFF_PLACEMENT_CORRECTIONS } from "@/lib/config/historicalResultCorrections";
 import type { PlayoffResult } from "@/lib/models";
+
+/** Applies any explicit, confirmed override from historicalResultCorrections.ts — see that file's doc comment. */
+function applyPlacementCorrection(result: PlayoffResult): PlayoffResult {
+  const correction = PLAYOFF_PLACEMENT_CORRECTIONS.find((c) => c.season === result.season);
+  const correctedPlace = correction?.placeByRosterId[result.rosterId];
+  return correctedPlace !== undefined ? { ...result, place: correctedPlace } : result;
+}
 
 export type OwnerPlayoffResult = PlayoffResult & {
   ownerId: string | null;
@@ -24,7 +33,10 @@ export type OwnerPlayoffResult = PlayoffResult & {
  * structure every year in this league, not assumed from one season.
  */
 export async function getAllPlayoffResults(): Promise<OwnerPlayoffResult[]> {
-  const fullChain = await getLeagueSeasonChain(getSleeperLeagueId());
+  const [fullChain, franchiseIdentity] = await Promise.all([
+    getLeagueSeasonChain(getSleeperLeagueId()),
+    getFranchiseIdentityMap(),
+  ]);
 
   const perSeason = await Promise.all(
     fullChain
@@ -56,14 +68,21 @@ export async function getAllPlayoffResults(): Promise<OwnerPlayoffResult[]> {
           winners,
           losers,
           playoffTeams
-        ).map((result): OwnerPlayoffResult => {
-          const ownerId = ownerIdByRosterId.get(result.rosterId) ?? null;
-          return {
-            ...result,
-            ownerId,
-            ownerName: ownerId ? ownerNameByOwnerId.get(ownerId) ?? null : null,
-          };
-        });
+        )
+          .map(applyPlacementCorrection)
+          .map((result): OwnerPlayoffResult => {
+            const rawOwnerId = ownerIdByRosterId.get(result.rosterId) ?? null;
+            if (!rawOwnerId) return { ...result, ownerId: null, ownerName: null };
+            const ownerId = canonicalizeOwnerId(rawOwnerId, franchiseIdentity);
+            return {
+              ...result,
+              ownerId,
+              ownerName:
+                franchiseIdentity.currentOwnerName.get(ownerId) ??
+                ownerNameByOwnerId.get(rawOwnerId) ??
+                null,
+            };
+          });
       })
   );
 

@@ -7,6 +7,7 @@ import {
   getDraftPicks,
   getSleeperLeagueId,
 } from "@/lib/sleeper";
+import { getFranchiseIdentityMap, canonicalizeOwnerId } from "./franchiseIdentityService";
 
 export type OwnerTransactionStats = {
   ownerId: string;
@@ -35,7 +36,10 @@ export async function getTransactionHistory(): Promise<{
   statsByOwnerId: Map<string, OwnerTransactionStats>;
   auctionPurchases: AuctionPurchase[];
 }> {
-  const fullChain = await getLeagueSeasonChain(getSleeperLeagueId());
+  const [fullChain, franchiseIdentity] = await Promise.all([
+    getLeagueSeasonChain(getSleeperLeagueId()),
+    getFranchiseIdentityMap(),
+  ]);
 
   const perSeason = await Promise.all(
     fullChain.map(async (league) => {
@@ -52,15 +56,33 @@ export async function getTransactionHistory(): Promise<{
         getDraftsForLeague(league.league_id),
       ]);
 
-      const ownerIdByRosterId = new Map(
-        rosters.map((roster) => [roster.roster_id, roster.owner_id])
-      );
-      const ownerNameByOwnerId = new Map(
+      const rawOwnerNameByOwnerId = new Map(
         owners.map((owner) => [
           owner.user_id,
           owner.metadata?.team_name ?? owner.display_name,
         ])
       );
+
+      // Canonicalized once per roster_id here, up front, so every
+      // downstream use (auction purchases, trades, waivers) below
+      // automatically attributes to whoever currently manages this
+      // franchise instead of whichever account held it that season.
+      const ownerIdByRosterId = new Map<number, string | null>();
+      const ownerNameByRosterId = new Map<number, string | null>();
+      for (const roster of rosters) {
+        if (!roster.owner_id) {
+          ownerIdByRosterId.set(roster.roster_id, null);
+          continue;
+        }
+        const ownerId = canonicalizeOwnerId(roster.owner_id, franchiseIdentity);
+        ownerIdByRosterId.set(roster.roster_id, ownerId);
+        ownerNameByRosterId.set(
+          roster.roster_id,
+          franchiseIdentity.currentOwnerName.get(ownerId) ??
+            rawOwnerNameByOwnerId.get(roster.owner_id) ??
+            null
+        );
+      }
 
       const auctionDraft = drafts.find(
         (draft) => draft.type === "auction" && draft.status === "complete"
@@ -75,13 +97,13 @@ export async function getTransactionHistory(): Promise<{
             season: Number(league.season),
             playerId: pick.player_id,
             ownerId,
-            ownerName: ownerId ? ownerNameByOwnerId.get(ownerId) ?? null : null,
+            ownerName: ownerId ? ownerNameByRosterId.get(pick.roster_id) ?? null : null,
             price: Number(pick.metadata.amount),
           });
         }
       }
 
-      return { transactions, ownerIdByRosterId, ownerNameByOwnerId, auctionPurchases };
+      return { transactions, ownerIdByRosterId, ownerNameByRosterId, auctionPurchases };
     })
   );
 
@@ -102,7 +124,7 @@ export async function getTransactionHistory(): Promise<{
 
   const auctionPurchases: AuctionPurchase[] = [];
 
-  for (const { transactions, ownerIdByRosterId, ownerNameByOwnerId, auctionPurchases: seasonPurchases } of perSeason) {
+  for (const { transactions, ownerIdByRosterId, ownerNameByRosterId, auctionPurchases: seasonPurchases } of perSeason) {
     auctionPurchases.push(...seasonPurchases);
 
     for (const transaction of transactions) {
@@ -112,14 +134,14 @@ export async function getTransactionHistory(): Promise<{
         for (const rosterId of transaction.roster_ids) {
           const ownerId = ownerIdByRosterId.get(rosterId);
           if (!ownerId) continue;
-          getStats(ownerId, ownerNameByOwnerId.get(ownerId) ?? null).trades += 1;
+          getStats(ownerId, ownerNameByRosterId.get(rosterId) ?? null).trades += 1;
         }
       } else if (transaction.type === "waiver") {
         const faabBid = transaction.settings?.waiver_bid ?? 0;
         for (const rosterId of transaction.roster_ids) {
           const ownerId = ownerIdByRosterId.get(rosterId);
           if (!ownerId) continue;
-          const stats = getStats(ownerId, ownerNameByOwnerId.get(ownerId) ?? null);
+          const stats = getStats(ownerId, ownerNameByRosterId.get(rosterId) ?? null);
           stats.waiverClaims += 1;
           stats.faabSpent += faabBid;
         }

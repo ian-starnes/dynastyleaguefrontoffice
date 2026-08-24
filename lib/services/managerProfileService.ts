@@ -1,4 +1,4 @@
-import { getLeagueSeasonChain, getOwnersForLeague, getOwners, getSleeperLeagueId } from "@/lib/sleeper";
+import { getLeagueSeasonChain, getOwners, getSleeperLeagueId } from "@/lib/sleeper";
 import {
   getAllWeeklyPerformances,
   computeLongestStreak,
@@ -7,6 +7,7 @@ import {
 import { getAllPlayoffResults } from "./playoffResultsService";
 import { getTransactionHistory } from "./transactionHistoryService";
 import { FranchiseValueService } from "./franchiseValueService";
+import { getFranchiseIdentityMap } from "./franchiseIdentityService";
 
 export type ManagerProfile = {
   ownerId: string;
@@ -14,7 +15,14 @@ export type ManagerProfile = {
   teamName: string | null;
   /** Real, user-uploaded avatar image URL — null if they never set one. Never fabricated. */
   avatarUrl: string | null;
-  /** Earliest season this owner_id appears in the league — "member of THIS league since," not a Sleeper-platform account date (which Sleeper doesn't expose). */
+  /**
+   * Earliest season THIS FRANCHISE has existed in the league — i.e. when
+   * the roster this manager now runs first appeared, not necessarily when
+   * this specific Sleeper account joined. A manager who took over an
+   * existing team via a real manager succession (see
+   * franchiseIdentityService.ts) inherits its founding season, per "team
+   * history travels with the team."
+   */
   memberSinceSeason: number;
   championships: number;
   runnerUps: number;
@@ -56,13 +64,14 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
   const rootLeagueId = getSleeperLeagueId();
   const fullChain = await getLeagueSeasonChain(rootLeagueId);
 
-  const [performances, playoffResults, transactionHistory, currentOwners, franchiseValuations] =
+  const [performances, playoffResults, transactionHistory, currentOwners, franchiseValuations, franchiseIdentity] =
     await Promise.all([
       getAllWeeklyPerformances(),
       getAllPlayoffResults(),
       getTransactionHistory(),
       getOwners(),
       new FranchiseValueService().getFranchiseValuations(),
+      getFranchiseIdentityMap(),
     ]);
 
   const playoffWeekStartBySeason = new Map<number, number>();
@@ -71,22 +80,6 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       Number(league.season),
       Number(league.settings.playoff_week_start ?? 15)
     );
-  }
-
-  const memberSinceBySeason = new Map<string, number>();
-  const seasonsPerOwner = await Promise.all(
-    fullChain.map(async (league) => {
-      const owners = await getOwnersForLeague(league.league_id);
-      return { season: Number(league.season), ownerIds: owners.map((o) => o.user_id) };
-    })
-  );
-  for (const { season, ownerIds } of seasonsPerOwner) {
-    for (const ownerId of ownerIds) {
-      const existing = memberSinceBySeason.get(ownerId);
-      if (existing === undefined || season < existing) {
-        memberSinceBySeason.set(ownerId, season);
-      }
-    }
   }
 
   const careerStats = getCareerStatsByOwner(performances);
@@ -157,7 +150,9 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       displayName: owner.display_name,
       teamName: owner.metadata?.team_name ?? null,
       avatarUrl: owner.metadata?.avatar ?? null,
-      memberSinceSeason: memberSinceBySeason.get(ownerId) ?? Number(fullChain[fullChain.length - 1].season),
+      memberSinceSeason:
+        franchiseIdentity.franchiseFoundedSeason.get(ownerId) ??
+        Number(fullChain[fullChain.length - 1].season),
       championships: ownerPlayoffResults.filter((r) => r.place === 1).length,
       runnerUps: ownerPlayoffResults.filter((r) => r.place === 2).length,
       thirdPlaceFinishes: ownerPlayoffResults.filter((r) => r.place === 3).length,
