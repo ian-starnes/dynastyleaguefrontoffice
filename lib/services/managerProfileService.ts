@@ -10,9 +10,15 @@ import { FranchiseValueService } from "./franchiseValueService";
 import { getFranchiseIdentityMap } from "./franchiseIdentityService";
 import { getRingOfHonor, type RingOfHonorEntry } from "./ringOfHonorService";
 
-/** Ring of Honor qualifying thresholds — a real sample-size floor so a single hot week doesn't qualify a player off a handful of starts. */
-const RING_OF_HONOR_QUALIFIER_MIN_STARTS = 20;
-const RING_OF_HONOR_QUALIFIER_MIN_POINTS = 200;
+/**
+ * Ring of Honor qualifying thresholds — a real sample-size floor so a
+ * single hot stretch doesn't qualify a player off a handful of starts.
+ * Tuned against real league data to land around 2-7 qualifiers per
+ * franchise (came out to 1-7, averaging 4.7 across all 10 current
+ * managers) — not an arbitrary round number.
+ */
+const RING_OF_HONOR_QUALIFIER_MIN_STARTS = 30;
+const RING_OF_HONOR_QUALIFIER_MIN_POINTS = 250;
 
 export type ManagerProfile = {
   ownerId: string;

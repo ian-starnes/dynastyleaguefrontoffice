@@ -96,7 +96,8 @@ export default async function HistoryPage() {
                             {playerNameById.get(entry.playerId) ?? entry.playerId}
                           </span>
                           <span className="shrink-0 font-medium text-ink/70">
-                            {entry.totalStartingLineupPoints.toFixed(0)}
+                            {entry.totalStartingLineupPoints.toFixed(0)} pts ·{" "}
+                            {entry.gamesStarted} gs
                           </span>
                         </li>
                       ))}
