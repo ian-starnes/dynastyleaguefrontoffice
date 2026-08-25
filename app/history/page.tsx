@@ -7,8 +7,7 @@ import { HeadToHeadTable } from "@/components/history/HeadToHeadTable";
 import { LeagueRecordsGrid } from "@/components/history/LeagueRecordsGrid";
 import { getLeagueHistory } from "@/lib/services/leagueHistoryService";
 import { getManagerProfiles } from "@/lib/services/managerProfileService";
-import { getLeaguePlayers } from "@/lib/league-players";
-import { FranchiseValueService } from "@/lib/services/franchiseValueService";
+import { getAllPlayerNames } from "@/lib/sleeper";
 
 // Server Component: all data access goes through the domain services —
 // leagueHistoryService composes weeklyPerformanceService,
@@ -18,45 +17,19 @@ import { FranchiseValueService } from "@/lib/services/franchiseValueService";
 // every other page in the app.
 export default async function HistoryPage() {
   try {
-    const [history, players, economicsSummary, franchiseValuations, managerProfiles] =
-      await Promise.all([
-        getLeagueHistory(),
-        getLeaguePlayers(),
-        new FranchiseValueService().getLeagueEconomicsSummary(),
-        new FranchiseValueService().getFranchiseValuations(),
-        getManagerProfiles(),
-      ]);
+    const [history, playerNameById, managerProfiles] = await Promise.all([
+      getLeagueHistory(),
+      // Unfiltered name lookup, not getLeaguePlayers() — Ring of Honor
+      // entries can reference a player who's since retired or hit free
+      // agency, and this page only ever needs their name, not their
+      // current market value/keeper economics.
+      getAllPlayerNames(),
+      getManagerProfiles(),
+    ]);
 
     const managers = [...managerProfiles.values()].sort(
       (a, b) => (a.teamName ?? a.displayName).localeCompare(b.teamName ?? b.displayName)
     );
-
-    const playerNameById = new Map(players.map((p) => [p.nflPlayer.id, p.nflPlayer.fullName]));
-
-    const highestAssetValuePlayer = [...players]
-      .filter((p) => p.assetValue !== null)
-      .sort((a, b) => (b.assetValue ?? 0) - (a.assetValue ?? 0))[0];
-
-    const largestKeeperSurplus = economicsSummary.largestKeeperSurplus
-      ? {
-          ownerName: economicsSummary.largestKeeperSurplus.player.currentOwnerName,
-          playerName: economicsSummary.largestKeeperSurplus.player.nflPlayer.fullName,
-          surplus: economicsSummary.largestKeeperSurplus.player.keeperSurplus ?? 0,
-        }
-      : null;
-
-    const highestAssetValue = highestAssetValuePlayer
-      ? {
-          ownerName: highestAssetValuePlayer.currentOwnerName,
-          playerName: highestAssetValuePlayer.nflPlayer.fullName,
-          value: highestAssetValuePlayer.assetValue ?? 0,
-        }
-      : null;
-
-    const topFranchise = franchiseValuations[0];
-    const highestFranchiseValue = topFranchise
-      ? { ownerName: topFranchise.ownerName, value: topFranchise.franchiseValue }
-      : null;
 
     const sortedHeadToHead = [...history.headToHead].sort(
       (a, b) =>
@@ -72,59 +45,67 @@ export default async function HistoryPage() {
 
         <h2 className="mt-10 font-serif text-xl text-primary">Managers</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {managers.map((manager) => {
-            const headliner = manager.ringOfHonorHeadliner;
-            const headlinerName = headliner
-              ? playerNameById.get(headliner.playerId) ?? headliner.playerId
-              : null;
-
-            return (
-              <Link key={manager.ownerId} href={`/history/managers/${manager.ownerId}`}>
-                <Card className="p-4 transition hover:border-gold/40">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-ink">
-                      {manager.teamName ?? manager.displayName}
-                    </p>
-                    <span className="shrink-0 text-ink/30">→</span>
-                  </div>
-                  <p className="text-xs text-ink/50">
-                    {manager.championships > 0
-                      ? `${manager.championships}x champion`
-                      : `Best finish: ${manager.bestFinish ?? "—"}`}
+          {managers.map((manager) => (
+            <Link key={manager.ownerId} href={`/history/managers/${manager.ownerId}`}>
+              <Card className="p-4 transition hover:border-gold/40">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-ink">
+                    {manager.teamName ?? manager.displayName}
                   </p>
+                  <span className="shrink-0 text-ink/30">→</span>
+                </div>
+                <p className="text-xs text-ink/50">
+                  {manager.championships > 0
+                    ? `${manager.championships}x champion`
+                    : `Best finish: ${manager.bestFinish ?? "—"}`}
+                </p>
 
-                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                    <div>
-                      <p className="text-ink/40">Avg Pts / Week</p>
-                      <p className="font-medium text-ink">
-                        {manager.averagePointsPerWeekAllTime.toFixed(1)}
-                      </p>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-ink/40">Ring of Honor</p>
-                      <p className="truncate font-medium text-ink">
-                        {headliner
-                          ? `${headlinerName} (${headliner.totalStartingLineupPoints.toFixed(0)})`
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-ink/40">PF Rank (All-Time)</p>
-                      <p className="font-medium text-ink">
-                        #{manager.careerPointsForRank} of {manager.totalManagers}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-ink/40">Win% Rank (All-Time)</p>
-                      <p className="font-medium text-ink">
-                        #{manager.winningPercentageRank} of {manager.totalManagers}
-                      </p>
-                    </div>
+                <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-2 text-xs">
+                  <div>
+                    <p className="text-ink/40">Avg Pts / Week</p>
+                    <p className="font-medium text-ink">
+                      {manager.averagePointsPerWeekAllTime.toFixed(1)}
+                    </p>
                   </div>
-                </Card>
-              </Link>
-            );
-          })}
+                  <div>
+                    <p className="text-ink/40">PF Rank (All-Time)</p>
+                    <p className="font-medium text-ink">
+                      #{manager.careerPointsForRank} of {manager.totalManagers}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-ink/40">Win% Rank (Reg. Season)</p>
+                    <p className="font-medium text-ink">
+                      #{manager.regularSeasonWinPercentageRank} of {manager.totalManagers}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 border-t border-black/5 pt-2">
+                  <p className="text-xs text-ink/40">Ring of Honor</p>
+                  {manager.ringOfHonorQualifiers.length === 0 ? (
+                    <p className="mt-1 text-xs font-medium text-ink">—</p>
+                  ) : (
+                    <ul className="mt-1 space-y-0.5">
+                      {manager.ringOfHonorQualifiers.map((entry) => (
+                        <li
+                          key={entry.playerId}
+                          className="flex items-baseline justify-between gap-2 text-xs"
+                        >
+                          <span className="truncate text-ink">
+                            {playerNameById.get(entry.playerId) ?? entry.playerId}
+                          </span>
+                          <span className="shrink-0 font-medium text-ink/70">
+                            {entry.totalStartingLineupPoints.toFixed(0)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </Card>
+            </Link>
+          ))}
         </div>
 
         <h2 className="mt-10 font-serif text-xl text-primary">Wall of Champions</h2>
@@ -143,12 +124,7 @@ export default async function HistoryPage() {
 
         <h2 className="mt-10 font-serif text-xl text-primary">League Records</h2>
         <div className="mt-4">
-          <LeagueRecordsGrid
-            records={history.records}
-            largestKeeperSurplus={largestKeeperSurplus}
-            highestAssetValue={highestAssetValue}
-            highestFranchiseValue={highestFranchiseValue}
-          />
+          <LeagueRecordsGrid records={history.records} />
         </div>
 
         <h2 className="mt-10 font-serif text-xl text-primary">All-Time Head-to-Head</h2>

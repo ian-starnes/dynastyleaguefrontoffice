@@ -41,3 +41,30 @@ export async function getPlayers(): Promise<NFLPlayer[]> {
     )
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
+
+/**
+ * Every player Sleeper has ever tracked, id -> display name, with NO
+ * roster-eligibility filtering — unlike getPlayers(), which deliberately
+ * excludes anyone without a CURRENT NFL team. Needed for historical name
+ * lookups (Ring of Honor, past-season records) where a player may have
+ * retired or hit free agency since the games in question were played;
+ * getPlayers()'s roster-eligible list silently drops those and would
+ * leave a raw player_id displayed instead of a name. Hits the exact same
+ * endpoint+options as getPlayers(), so Next's automatic per-request fetch
+ * memoization serves both from one real network call, not two, when both
+ * are used in the same request.
+ */
+export async function getAllPlayerNames(): Promise<Map<string, string>> {
+  const playersById = await sleeperFetch<SleeperPlayersMap>("/players/nfl", {
+    next: { revalidate: 86400 },
+  });
+
+  const names = new Map<string, string>();
+  for (const player of Object.values(playersById)) {
+    names.set(
+      player.player_id,
+      player.full_name ?? `${player.first_name ?? ""} ${player.last_name ?? ""}`.trim()
+    );
+  }
+  return names;
+}

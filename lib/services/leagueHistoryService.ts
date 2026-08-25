@@ -344,8 +344,6 @@ export type LeagueRecords = {
   mostChampionships: { ownerId: string; ownerName: string | null; count: number } | null;
   mostFinalsAppearances: { ownerId: string; ownerName: string | null; count: number } | null;
   mostThirdPlaceFinishes: { ownerId: string; ownerName: string | null; count: number } | null;
-  longestWinningStreakEver: { ownerId: string; ownerName: string | null; length: number } | null;
-  longestLosingStreakEver: { ownerId: string; ownerName: string | null; length: number } | null;
   largestBlowout: { season: number; week: number; winnerOwnerName: string | null; margin: number } | null;
   closestVictory: { season: number; week: number; winnerOwnerName: string | null; margin: number } | null;
   mostTrades: OwnerTransactionStats | null;
@@ -353,28 +351,6 @@ export type LeagueRecords = {
   mostFaabSpent: OwnerTransactionStats | null;
   highestAuctionPurchase: AuctionPurchase | null;
 };
-
-function longestStreakEver(
-  performances: OwnerWeeklyPerformance[],
-  result: "win" | "loss"
-): { ownerId: string; ownerName: string | null; length: number } | null {
-  const byOwner = new Map<string, OwnerWeeklyPerformance[]>();
-  for (const p of performances) {
-    if (!p.ownerId) continue;
-    const list = byOwner.get(p.ownerId) ?? [];
-    list.push(p);
-    byOwner.set(p.ownerId, list);
-  }
-
-  let best: { ownerId: string; ownerName: string | null; length: number } | null = null;
-  for (const [ownerId, games] of byOwner) {
-    const bestForOwner = computeLongestStreak(games, result);
-    if (bestForOwner > 0 && (!best || bestForOwner > best.length)) {
-      best = { ownerId, ownerName: games[0].ownerName, length: bestForOwner };
-    }
-  }
-  return best;
-}
 
 export function computeLeagueRecords(
   performances: OwnerWeeklyPerformance[],
@@ -494,8 +470,6 @@ export function computeLeagueRecords(
     mostChampionships: topPlacementCounter((place) => place === 1),
     mostFinalsAppearances: topPlacementCounter((place) => place === 1 || place === 2),
     mostThirdPlaceFinishes: topPlacementCounter((place) => place === 3),
-    longestWinningStreakEver: longestStreakEver(performances, "win"),
-    longestLosingStreakEver: longestStreakEver(performances, "loss"),
     largestBlowout: largestBlowout
       ? {
           season: largestBlowout.season,

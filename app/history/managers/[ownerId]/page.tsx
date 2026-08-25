@@ -6,7 +6,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { formatDollarValue } from "@/lib/format";
 import { getManagerProfiles } from "@/lib/services/managerProfileService";
 import { getRingOfHonor } from "@/lib/services/ringOfHonorService";
-import { getPlayers } from "@/lib/sleeper";
+import { getAllPlayerNames } from "@/lib/sleeper";
 
 export default async function ManagerProfilePage({
   params,
@@ -15,16 +15,19 @@ export default async function ManagerProfilePage({
 }) {
   const { ownerId } = await params;
 
-  const [profiles, ringOfHonor, players] = await Promise.all([
+  const [profiles, ringOfHonor, nameById] = await Promise.all([
     getManagerProfiles(),
     getRingOfHonor(),
-    getPlayers(),
+    // Unfiltered lookup, not getPlayers() — a Ring of Honor entry can
+    // reference a player who's since retired or hit free agency, which
+    // getPlayers()'s roster-eligible filter would silently drop, leaving
+    // a raw player_id displayed instead of a name.
+    getAllPlayerNames(),
   ]);
 
   const profile = profiles.get(ownerId);
   if (!profile) notFound();
 
-  const nameById = new Map(players.map((p) => [p.id, p.fullName]));
   const ring = ringOfHonor.filter((entry) => entry.ownerId === ownerId).slice(0, 15);
 
   return (

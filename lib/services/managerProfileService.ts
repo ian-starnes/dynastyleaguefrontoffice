@@ -10,9 +10,9 @@ import { FranchiseValueService } from "./franchiseValueService";
 import { getFranchiseIdentityMap } from "./franchiseIdentityService";
 import { getRingOfHonor, type RingOfHonorEntry } from "./ringOfHonorService";
 
-/** Ring of Honor "headliner" qualifying thresholds — a real sample-size floor so a single hot week doesn't crown a headliner off a handful of starts. */
-const RING_OF_HONOR_HEADLINER_MIN_STARTS = 20;
-const RING_OF_HONOR_HEADLINER_MIN_POINTS = 200;
+/** Ring of Honor qualifying thresholds — a real sample-size floor so a single hot week doesn't qualify a player off a handful of starts. */
+const RING_OF_HONOR_QUALIFIER_MIN_STARTS = 20;
+const RING_OF_HONOR_QUALIFIER_MIN_POINTS = 200;
 
 export type ManagerProfile = {
   ownerId: string;
@@ -39,6 +39,8 @@ export type ManagerProfile = {
   allTimeLosses: number;
   allTimeTies: number;
   winningPercentage: number;
+  /** Regular-season games only (excludes every playoff week) — the basis for regularSeasonWinPercentageRank below, per an explicit request that the win% ranking not be skewed by playoff-only appearances. */
+  regularSeasonWinningPercentage: number;
   playoffWins: number;
   playoffLosses: number;
   playoffTies: number;
@@ -55,22 +57,21 @@ export type ManagerProfile = {
   /** Null if this owner no longer holds a roster in the current season (e.g. left the league). */
   currentFranchiseValue: number | null;
   /**
-   * This franchise's best qualifying Ring of Honor entry — the
-   * highest-total-points player among those started at least
-   * RING_OF_HONOR_HEADLINER_MIN_STARTS times with at least
-   * RING_OF_HONOR_HEADLINER_MIN_POINTS while on this roster. Null if no
-   * player meets both thresholds yet (a young or small-sample franchise).
+   * Every Ring of Honor entry for this franchise that clears BOTH
+   * RING_OF_HONOR_QUALIFIER_MIN_STARTS and RING_OF_HONOR_QUALIFIER_MIN_POINTS
+   * — not just the single best one. Already sorted highest total points
+   * first; empty (not null) if nobody qualifies yet.
    */
-  ringOfHonorHeadliner: {
+  ringOfHonorQualifiers: {
     playerId: string;
     totalStartingLineupPoints: number;
     gamesStarted: number;
-  } | null;
+  }[];
   /** 1 = highest career points-for among every current manager. */
   careerPointsForRank: number;
-  /** 1 = highest all-time win percentage among every current manager. */
-  winningPercentageRank: number;
-  /** How many current managers these two ranks are out of. */
+  /** 1 = highest regularSeasonWinningPercentage among every current manager. */
+  regularSeasonWinPercentageRank: number;
+  /** How many current managers these ranks are out of. */
   totalManagers: number;
 };
 
@@ -121,19 +122,19 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     performancesByOwnerId.set(performance.ownerId, list);
   }
 
-  // ringOfHonor is already sorted highest-total-points first, so the
-  // first qualifying entry seen per owner is that franchise's headliner.
-  const ringOfHonorHeadlinerByOwnerId = new Map<string, RingOfHonorEntry>();
+  // ringOfHonor is already sorted highest-total-points first, so each
+  // owner's list of qualifiers comes out pre-sorted too.
+  const ringOfHonorQualifiersByOwnerId = new Map<string, RingOfHonorEntry[]>();
   for (const entry of ringOfHonor) {
     if (
-      entry.gamesStarted < RING_OF_HONOR_HEADLINER_MIN_STARTS ||
-      entry.totalStartingLineupPoints < RING_OF_HONOR_HEADLINER_MIN_POINTS
+      entry.gamesStarted < RING_OF_HONOR_QUALIFIER_MIN_STARTS ||
+      entry.totalStartingLineupPoints < RING_OF_HONOR_QUALIFIER_MIN_POINTS
     ) {
       continue;
     }
-    if (!ringOfHonorHeadlinerByOwnerId.has(entry.ownerId)) {
-      ringOfHonorHeadlinerByOwnerId.set(entry.ownerId, entry);
-    }
+    const list = ringOfHonorQualifiersByOwnerId.get(entry.ownerId) ?? [];
+    list.push(entry);
+    ringOfHonorQualifiersByOwnerId.set(entry.ownerId, list);
   }
 
   const profiles = new Map<string, ManagerProfile>();
@@ -149,6 +150,16 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     const playoffWins = playoffGames.filter((p) => p.result === "win").length;
     const playoffLosses = playoffGames.filter((p) => p.result === "loss").length;
     const playoffTies = playoffGames.filter((p) => p.result === "tie").length;
+
+    const regularSeasonGames = ownerPerformances.filter(
+      (p) => p.week < (playoffWeekStartBySeason.get(p.season) ?? Infinity)
+    );
+    const regularSeasonWins = regularSeasonGames.filter((p) => p.result === "win").length;
+    const regularSeasonLosses = regularSeasonGames.filter((p) => p.result === "loss").length;
+    const regularSeasonTies = regularSeasonGames.filter((p) => p.result === "tie").length;
+    const regularSeasonGamesPlayed = regularSeasonWins + regularSeasonLosses + regularSeasonTies;
+    const regularSeasonWinningPercentage =
+      regularSeasonGamesPlayed > 0 ? regularSeasonWins / regularSeasonGamesPlayed : 0;
 
     const ownerPlayoffResults = playoffResults.filter((r) => r.ownerId === ownerId);
     const finishes = ownerPlayoffResults.map((r) => r.place);
@@ -186,7 +197,7 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     const ties = stats?.ties ?? 0;
     const totalGames = wins + losses + ties;
 
-    const headliner = ringOfHonorHeadlinerByOwnerId.get(ownerId) ?? null;
+    const qualifiers = ringOfHonorQualifiersByOwnerId.get(ownerId) ?? [];
 
     profiles.set(ownerId, {
       ownerId,
@@ -205,6 +216,7 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       allTimeLosses: losses,
       allTimeTies: ties,
       winningPercentage: totalGames > 0 ? wins / totalGames : 0,
+      regularSeasonWinningPercentage,
       playoffWins,
       playoffLosses,
       playoffTies,
@@ -219,16 +231,14 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       totalWaiverClaims: txStats?.waiverClaims ?? 0,
       totalFaabSpent: txStats?.faabSpent ?? 0,
       currentFranchiseValue: franchiseValueByOwnerId.get(ownerId) ?? null,
-      ringOfHonorHeadliner: headliner
-        ? {
-            playerId: headliner.playerId,
-            totalStartingLineupPoints: headliner.totalStartingLineupPoints,
-            gamesStarted: headliner.gamesStarted,
-          }
-        : null,
+      ringOfHonorQualifiers: qualifiers.map((entry) => ({
+        playerId: entry.playerId,
+        totalStartingLineupPoints: entry.totalStartingLineupPoints,
+        gamesStarted: entry.gamesStarted,
+      })),
       // Ranks filled in below, once every profile exists to rank against.
       careerPointsForRank: 0,
-      winningPercentageRank: 0,
+      regularSeasonWinPercentageRank: 0,
       totalManagers: currentOwners.length,
     });
   }
@@ -238,11 +248,11 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
   byCareerPointsFor.forEach((profile, index) => {
     profiles.get(profile.ownerId)!.careerPointsForRank = index + 1;
   });
-  const byWinningPercentage = [...allProfiles].sort(
-    (a, b) => b.winningPercentage - a.winningPercentage
+  const byRegularSeasonWinPercentage = [...allProfiles].sort(
+    (a, b) => b.regularSeasonWinningPercentage - a.regularSeasonWinningPercentage
   );
-  byWinningPercentage.forEach((profile, index) => {
-    profiles.get(profile.ownerId)!.winningPercentageRank = index + 1;
+  byRegularSeasonWinPercentage.forEach((profile, index) => {
+    profiles.get(profile.ownerId)!.regularSeasonWinPercentageRank = index + 1;
   });
 
   return profiles;

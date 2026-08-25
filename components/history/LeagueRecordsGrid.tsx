@@ -2,24 +2,7 @@ import { StatTile } from "@/components/ui/StatTile";
 import { formatDollarValue } from "@/lib/format";
 import type { LeagueRecords } from "@/lib/services/leagueHistoryService";
 
-/**
- * largestKeeperSurplus/highestAssetValue/highestFranchiseValue are
- * CURRENT-state snapshots (from lib/services/franchiseValueService.ts),
- * not accumulated history like the rest of this grid — kept as separate
- * props rather than folded into LeagueRecords, since they're a different
- * kind of fact (today's roster, not "ever recorded").
- */
-export function LeagueRecordsGrid({
-  records,
-  largestKeeperSurplus,
-  highestAssetValue,
-  highestFranchiseValue,
-}: {
-  records: LeagueRecords;
-  largestKeeperSurplus: { ownerName: string | null; playerName: string; surplus: number } | null;
-  highestAssetValue: { ownerName: string | null; playerName: string; value: number } | null;
-  highestFranchiseValue: { ownerName: string | null; value: number } | null;
-}) {
+export function LeagueRecordsGrid({ records }: { records: LeagueRecords }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
       <StatTile
@@ -74,16 +57,6 @@ export function LeagueRecordsGrid({
         sublabel={records.mostThirdPlaceFinishes?.ownerName ?? undefined}
       />
       <StatTile
-        label="Longest Winning Streak"
-        value={records.longestWinningStreakEver?.length ?? "—"}
-        sublabel={records.longestWinningStreakEver?.ownerName ?? undefined}
-      />
-      <StatTile
-        label="Longest Losing Streak"
-        value={records.longestLosingStreakEver?.length ?? "—"}
-        sublabel={records.longestLosingStreakEver?.ownerName ?? undefined}
-      />
-      <StatTile
         label="Largest Blowout"
         value={records.largestBlowout ? `+${records.largestBlowout.margin.toFixed(1)}` : "—"}
         sublabel={
@@ -128,29 +101,6 @@ export function LeagueRecordsGrid({
             ? `${records.highestAuctionPurchase.ownerName} · ${records.highestAuctionPurchase.season}`
             : undefined
         }
-      />
-      <StatTile
-        label="Largest Keeper Surplus (Current)"
-        value={largestKeeperSurplus ? formatDollarValue(largestKeeperSurplus.surplus) : "—"}
-        sublabel={
-          largestKeeperSurplus
-            ? `${largestKeeperSurplus.playerName} · ${largestKeeperSurplus.ownerName ?? "Free agent"}`
-            : undefined
-        }
-      />
-      <StatTile
-        label="Highest Asset Value (Current)"
-        value={highestAssetValue ? formatDollarValue(highestAssetValue.value) : "—"}
-        sublabel={
-          highestAssetValue
-            ? `${highestAssetValue.playerName} · ${highestAssetValue.ownerName ?? "Free agent"}`
-            : undefined
-        }
-      />
-      <StatTile
-        label="Highest Franchise Value (Current)"
-        value={highestFranchiseValue ? formatDollarValue(highestFranchiseValue.value) : "—"}
-        sublabel={highestFranchiseValue?.ownerName ?? undefined}
       />
     </div>
   );
