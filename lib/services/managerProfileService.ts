@@ -14,11 +14,11 @@ import { getRingOfHonor, type RingOfHonorEntry } from "./ringOfHonorService";
  * Ring of Honor qualifying thresholds — a real sample-size floor so a
  * single hot stretch doesn't qualify a player off a handful of starts.
  * Tuned against real league data to land around 2-7 qualifiers per
- * franchise (came out to 1-7, averaging 4.7 across all 10 current
- * managers) — not an arbitrary round number.
+ * franchise (came out to 1-6, averaging 3.9 across all 10 current
+ * managers) — not arbitrary round numbers.
  */
 const RING_OF_HONOR_QUALIFIER_MIN_STARTS = 30;
-const RING_OF_HONOR_QUALIFIER_MIN_POINTS = 250;
+const RING_OF_HONOR_QUALIFIER_MIN_POINTS = 400;
 
 export type ManagerProfile = {
   ownerId: string;
