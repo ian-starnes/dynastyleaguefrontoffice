@@ -1,5 +1,5 @@
-import { getAllWeeklyPerformances } from "./weeklyPerformanceService";
-import { getAllPlayoffResults } from "./playoffResultsService";
+import { getAllWeeklyPerformances, type OwnerWeeklyPerformance } from "./weeklyPerformanceService";
+import { getAllPlayoffResults, type OwnerPlayoffResult } from "./playoffResultsService";
 import { getLeagueSeasonChain, getSleeperLeagueId } from "@/lib/sleeper";
 
 export type RingOfHonorEntry = {
@@ -37,11 +37,12 @@ export type RingOfHonorEntry = {
  * playoffResultsService, place 1 or 2) — not just "started in the
  * playoffs generally."
  */
-export async function getRingOfHonor(): Promise<RingOfHonorEntry[]> {
-  const [performances, playoffResults] = await Promise.all([
-    getAllWeeklyPerformances(),
-    getAllPlayoffResults(),
-  ]);
+export async function getRingOfHonor(
+  precomputed?: { performances: OwnerWeeklyPerformance[]; playoffResults: OwnerPlayoffResult[] }
+): Promise<RingOfHonorEntry[]> {
+  const [performances, playoffResults] = precomputed
+    ? [precomputed.performances, precomputed.playoffResults]
+    : await Promise.all([getAllWeeklyPerformances(), getAllPlayoffResults()]);
 
   const fullChain = await getLeagueSeasonChain(getSleeperLeagueId());
   const playoffWeekStartBySeason = new Map<number, number>();

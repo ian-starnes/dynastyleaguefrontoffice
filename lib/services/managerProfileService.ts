@@ -8,6 +8,11 @@ import { getAllPlayoffResults } from "./playoffResultsService";
 import { getTransactionHistory } from "./transactionHistoryService";
 import { FranchiseValueService } from "./franchiseValueService";
 import { getFranchiseIdentityMap } from "./franchiseIdentityService";
+import { getRingOfHonor, type RingOfHonorEntry } from "./ringOfHonorService";
+
+/** Ring of Honor "headliner" qualifying thresholds — a real sample-size floor so a single hot week doesn't crown a headliner off a handful of starts. */
+const RING_OF_HONOR_HEADLINER_MIN_STARTS = 20;
+const RING_OF_HONOR_HEADLINER_MIN_POINTS = 200;
 
 export type ManagerProfile = {
   ownerId: string;
@@ -49,6 +54,24 @@ export type ManagerProfile = {
   totalFaabSpent: number;
   /** Null if this owner no longer holds a roster in the current season (e.g. left the league). */
   currentFranchiseValue: number | null;
+  /**
+   * This franchise's best qualifying Ring of Honor entry — the
+   * highest-total-points player among those started at least
+   * RING_OF_HONOR_HEADLINER_MIN_STARTS times with at least
+   * RING_OF_HONOR_HEADLINER_MIN_POINTS while on this roster. Null if no
+   * player meets both thresholds yet (a young or small-sample franchise).
+   */
+  ringOfHonorHeadliner: {
+    playerId: string;
+    totalStartingLineupPoints: number;
+    gamesStarted: number;
+  } | null;
+  /** 1 = highest career points-for among every current manager. */
+  careerPointsForRank: number;
+  /** 1 = highest all-time win percentage among every current manager. */
+  winningPercentageRank: number;
+  /** How many current managers these two ranks are out of. */
+  totalManagers: number;
 };
 
 /**
@@ -73,6 +96,9 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       new FranchiseValueService().getFranchiseValuations(),
       getFranchiseIdentityMap(),
     ]);
+  // Reuses the performances/playoffResults already fetched above rather
+  // than letting getRingOfHonor() re-fetch and recompute them itself.
+  const ringOfHonor = await getRingOfHonor({ performances, playoffResults });
 
   const playoffWeekStartBySeason = new Map<number, number>();
   for (const league of fullChain) {
@@ -93,6 +119,21 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     const list = performancesByOwnerId.get(performance.ownerId) ?? [];
     list.push(performance);
     performancesByOwnerId.set(performance.ownerId, list);
+  }
+
+  // ringOfHonor is already sorted highest-total-points first, so the
+  // first qualifying entry seen per owner is that franchise's headliner.
+  const ringOfHonorHeadlinerByOwnerId = new Map<string, RingOfHonorEntry>();
+  for (const entry of ringOfHonor) {
+    if (
+      entry.gamesStarted < RING_OF_HONOR_HEADLINER_MIN_STARTS ||
+      entry.totalStartingLineupPoints < RING_OF_HONOR_HEADLINER_MIN_POINTS
+    ) {
+      continue;
+    }
+    if (!ringOfHonorHeadlinerByOwnerId.has(entry.ownerId)) {
+      ringOfHonorHeadlinerByOwnerId.set(entry.ownerId, entry);
+    }
   }
 
   const profiles = new Map<string, ManagerProfile>();
@@ -145,6 +186,8 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     const ties = stats?.ties ?? 0;
     const totalGames = wins + losses + ties;
 
+    const headliner = ringOfHonorHeadlinerByOwnerId.get(ownerId) ?? null;
+
     profiles.set(ownerId, {
       ownerId,
       displayName: owner.display_name,
@@ -176,8 +219,31 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       totalWaiverClaims: txStats?.waiverClaims ?? 0,
       totalFaabSpent: txStats?.faabSpent ?? 0,
       currentFranchiseValue: franchiseValueByOwnerId.get(ownerId) ?? null,
+      ringOfHonorHeadliner: headliner
+        ? {
+            playerId: headliner.playerId,
+            totalStartingLineupPoints: headliner.totalStartingLineupPoints,
+            gamesStarted: headliner.gamesStarted,
+          }
+        : null,
+      // Ranks filled in below, once every profile exists to rank against.
+      careerPointsForRank: 0,
+      winningPercentageRank: 0,
+      totalManagers: currentOwners.length,
     });
   }
+
+  const allProfiles = [...profiles.values()];
+  const byCareerPointsFor = [...allProfiles].sort((a, b) => b.careerPointsFor - a.careerPointsFor);
+  byCareerPointsFor.forEach((profile, index) => {
+    profiles.get(profile.ownerId)!.careerPointsForRank = index + 1;
+  });
+  const byWinningPercentage = [...allProfiles].sort(
+    (a, b) => b.winningPercentage - a.winningPercentage
+  );
+  byWinningPercentage.forEach((profile, index) => {
+    profiles.get(profile.ownerId)!.winningPercentageRank = index + 1;
+  });
 
   return profiles;
 }
