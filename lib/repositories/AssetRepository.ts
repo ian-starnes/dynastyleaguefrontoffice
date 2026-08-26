@@ -34,9 +34,9 @@ function rowToAssetRecord(row: AssetRow): AssetRecord {
 /**
  * Stores only the FACTS about an asset's contract — never keeperCost,
  * marketValue, keeperSurplus, or assetValue. Those are always derived at
- * read time by lib/services/assetCalculator.ts from these facts plus live
- * FantasyCalc data, so a stale cached column here could never cause them
- * to drift.
+ * read time by lib/services/assetCalculator.ts from these facts plus the
+ * live ROS valuation engine (lib/services/rosValuationService.ts), so a
+ * stale cached column here could never cause them to drift.
  */
 export class AssetRepository {
   async upsertAsset(asset: AssetRecord): Promise<void> {

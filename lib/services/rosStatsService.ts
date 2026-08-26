@@ -62,18 +62,38 @@ function emptyTeamTotals(): TeamTotals {
  * SEASON-IN-SCOPE LOGIC (confirmed live, not assumed): Sleeper's
  * /state/nfl reports whether the current season has actually started
  * generating regular-season stats. If it has, this uses the current
- * season's completed weeks. If the current season has zero regular-
- * season games yet — the real state at the time this was built, still
- * preseason — this falls back to the most recently COMPLETED season's
- * full year as the baseline. Either way, recency weighting is always
- * applied to whichever weeks are in scope (fixed from an earlier
- * version that skipped weighting entirely in the fallback case — a real
- * bug the first verification pass surfaced: a player who struggled
- * early in the fallback season but finished strong was getting dragged
- * down by an unweighted full-season average instead of reflecting their
- * more recent, more predictive form). This fallback itself remains a
- * real, stated limitation — not a fabrication — and seasonUsed on every
- * result tells the caller which case they're in.
+ * season's completed weeks. Once the regular season ends and the real
+ * NFL playoffs begin, state.season_type flips to "post" while
+ * state.season stays the year whose regular season just finished — that
+ * full season (all MAX_WEEK weeks) is the most recent real baseline, NOT
+ * state.previous_season (a confirmed bug: the original "regular" check
+ * missed "post" entirely and fell back a full extra year stale during
+ * every real NFL playoff window). Only genuine preseason — no
+ * current-season regular-season data exists at all yet — falls back to
+ * the most recently COMPLETED season's full year. Either way, recency
+ * weighting is always applied to whichever weeks are in scope (fixed
+ * from an earlier version that skipped weighting entirely in the
+ * fallback case — a real bug the first verification pass surfaced: a
+ * player who struggled early in the fallback season but finished strong
+ * was getting dragged down by an unweighted full-season average instead
+ * of reflecting their more recent, more predictive form). The preseason
+ * fallback itself remains a real, stated limitation — not a fabrication
+ * — and seasonUsed on every result tells the caller which case they're in.
+ *
+ * KNOWN LIMITATION (not fixed, documented instead): team-level share
+ * metrics (targetShare, snapShare, etc.) attribute every week in scope
+ * to a player's CURRENT team (from precomputedPlayers/getPlayers()'s
+ * today snapshot), not whichever team they were actually on that
+ * specific historical week. Sleeper's weekly stats payload has no
+ * per-week team field to do this correctly (confirmed via direct API
+ * check), and reconstructing real per-week rosters historically would
+ * need a materially different, much more expensive data source. This
+ * only matters for a player who was traded mid-season within the
+ * season in scope — their pre-trade weeks get double-counted into
+ * their new team's totals and dropped from their old team's — everyone
+ * else is unaffected. A player's OWN weightedPPG/seasonPPG (the
+ * dominant Component A signal) is unaffected either way, since that's
+ * accumulated per-player regardless of team.
  */
 export async function getROSStats(
   precomputedPlayers?: NFLPlayer[]
@@ -87,13 +107,33 @@ export async function getROSStats(
   if (state.season_type === "regular" && state.week > 1) {
     seasonUsed = currentSeason;
     weeksInScope = Array.from({ length: state.week - 1 }, (_, i) => i + 1);
+  } else if (state.season_type === "post") {
+    seasonUsed = currentSeason;
+    weeksInScope = Array.from({ length: MAX_WEEK }, (_, i) => i + 1);
   } else {
     seasonUsed = Number(state.previous_season);
     weeksInScope = Array.from({ length: MAX_WEEK }, (_, i) => i + 1);
   }
 
   const [weeklyStatsByWeek, players] = await Promise.all([
-    Promise.all(weeksInScope.map((week) => getWeeklyStats(seasonUsed, week))),
+    Promise.all(
+      weeksInScope.map(async (week) => {
+        try {
+          return await getWeeklyStats(seasonUsed, week);
+        } catch (error: unknown) {
+          // One flaky week (rate limit, timeout) shouldn't take down
+          // Market Value league-wide — degrade that single week to "no
+          // data" rather than rejecting the whole valuation, which the
+          // top-level caller in lib/league-players.ts would otherwise
+          // turn into "—" for every player, not just the affected week.
+          console.error(
+            `Weekly stats fetch failed for season ${seasonUsed} week ${week}, treating as no data for that week:`,
+            error
+          );
+          return {} as SleeperWeeklyStatsMap;
+        }
+      })
+    ),
     precomputedPlayers ?? getPlayers(),
   ]);
 
@@ -117,10 +157,14 @@ export async function getROSStats(
   const teamTotalsByWeek: Map<number, Map<string, TeamTotals>> = new Map();
 
   // First pass: accumulate each team's totals per week for every share metric.
+  // Same !stat.gp skip as the player pass below — a player's row for a
+  // week they didn't play should be all-zero already, but this doesn't
+  // rely on that being guaranteed by Sleeper's payload.
   weeksInScope.forEach((week, weekIndex) => {
     const stats = weeklyStatsByWeek[weekIndex];
     const teamTotals = new Map<string, TeamTotals>();
     for (const [playerId, stat] of Object.entries(stats)) {
+      if (!stat.gp) continue;
       const team = teamByPlayerId.get(playerId);
       if (!team) continue;
       const totals = teamTotals.get(team) ?? emptyTeamTotals();
