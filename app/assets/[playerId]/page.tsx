@@ -174,10 +174,16 @@ export default async function PlayerProfilePage({
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
             FantasyPros ECR
           </p>
-          <p className="mt-2 font-serif text-3xl text-ink/30">—</p>
-          <p className="mt-2 text-xs text-ink/40">
-            Not yet available — requires a licensed FantasyPros API key.
+          <p
+            className={`mt-2 font-serif text-3xl ${player.fantasyProsECR !== null ? "text-ink" : "text-ink/30"}`}
+          >
+            {player.fantasyProsECR ?? "—"}
           </p>
+          {player.fantasyProsECR === null && (
+            <p className="mt-2 text-xs text-ink/40">
+              Not yet available for this player.
+            </p>
+          )}
         </Card>
       </div>
 

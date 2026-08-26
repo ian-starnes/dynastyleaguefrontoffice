@@ -2,6 +2,7 @@ import { getPlayers, type NFLPlayer } from "@/lib/sleeper";
 import { getROSStats, type ROSStats } from "./rosStatsService";
 import { getReplacementLevels, type ReplacementLevel } from "./replacementLevelService";
 import { getROSConsensusValues, normalizeConsensusRank, type ROSConsensusPlayer } from "./rosConsensusService";
+import { normalizePlayerName } from "./fantasycalc";
 import {
   ROS_VALUATION_WEIGHTS,
   AUCTION_ECONOMY,
@@ -193,6 +194,16 @@ function blendProjection(
   // Consensus is a rank-based 0-1 score already comparable across the
   // full ranked pool by construction (normalizeConsensusRank) — treated
   // as its own z-equivalent centered at 0.5.
+  //
+  // KNOWN GAP (currently inert, not fixed): this +-2 cap is tighter than
+  // ppgZ/opportunityZ's real, unbounded z-scores (which routinely exceed
+  // +-2 for outlier players), so once rosConsensusService.ts stops being
+  // a stub, Component C's practical influence on the blend will run
+  // below its nominal 15% weight. Harmless today only because
+  // consensusScore is always null (no licensed consensus API access
+  // yet) — every real blend currently excludes this term entirely. Needs
+  // re-tuning against real consensus data before that data exists, not
+  // guessed at blind now.
   const consensusZ = consensusScore !== null ? (consensusScore - 0.5) * 4 : null;
 
   const components: Array<[number | null, number]> = [
@@ -256,7 +267,12 @@ export async function calculateAllROSAuctionValues(
 
     const opportunityScore = computeOpportunityScore(player.position, stats);
 
-    const consensus = consensusValues.get(player.id);
+    // FantasyPros' API exposes no Sleeper ID (confirmed live) — matched
+    // by normalized name only, same fallback pattern used for FantasyCalc
+    // elsewhere in this codebase.
+    const consensus =
+      consensusValues.get(player.id) ??
+      consensusValues.get(normalizePlayerName(player.fullName));
     const consensusRank = consensus?.fantasyProsRosRank ?? consensus?.pffRosRank ?? null;
     const consensusScore = normalizeConsensusRank(consensusRank, consensusPoolSize);
 
