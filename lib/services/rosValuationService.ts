@@ -170,15 +170,57 @@ function computePositionOpportunityDistribution(
 }
 
 /**
+ * Peter Acklam's rational approximation for the probit function (inverse
+ * of the standard normal CDF) — accurate to about 1.15e-9, a standard,
+ * widely-used technique for converting a percentile/rank into a real
+ * z-score (the same idea behind "normal scores"/rankits in statistics).
+ * Clamped away from the exact 0/1 boundary (where the true probit is
+ * +-Infinity) so the single #1-ranked player in a pool gets a large but
+ * finite z-score (~5.7) instead of blowing up the blend.
+ */
+function probit(p: number): number {
+  const clamped = Math.min(1 - 1e-9, Math.max(1e-9, p));
+
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.383577518672690e2, -3.066479806614716e1, 2.506628277459239e0];
+  const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+  const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838e0, -2.549732539343734e0, 4.374664141464968e0, 2.938163982698783e0];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0, 3.754408661907416e0];
+
+  const pLow = 0.02425;
+  const pHigh = 1 - pLow;
+
+  if (clamped < pLow) {
+    const q = Math.sqrt(-2 * Math.log(clamped));
+    return (
+      (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+      ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+    );
+  }
+  if (clamped <= pHigh) {
+    const q = clamped - 0.5;
+    const r = q * q;
+    return (
+      ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q) /
+      (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
+    );
+  }
+  const q = Math.sqrt(-2 * Math.log(1 - clamped));
+  return -(
+    (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) /
+    ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+  );
+}
+
+/**
  * Blends Components A (rest-of-season PPG projection), B (opportunity),
- * and C (consensus, currently always null pending real API access) via
- * z-scores within the player's own position pool, per
- * ROS_VALUATION_WEIGHTS — renormalized across whichever components
- * actually have real data for this player, rather than silently
- * shrinking a player's score because one input is missing. The blended
- * z-score is converted back into PPG units (position mean + z*stdDev)
- * so it stays directly comparable to replacementValue, which is also a
- * real PPG figure from the same distribution.
+ * and C (consensus, real FantasyPros data when a key is configured —
+ * see rosConsensusService.ts) via z-scores within the player's own
+ * position pool, per ROS_VALUATION_WEIGHTS — renormalized across
+ * whichever components actually have real data for this player, rather
+ * than silently shrinking a player's score because one input is missing.
+ * The blended z-score is converted back into PPG units (position mean +
+ * z*stdDev) so it stays directly comparable to replacementValue, which
+ * is also a real PPG figure from the same distribution.
  */
 function blendProjection(
   position: FantasyPosition,
@@ -191,20 +233,17 @@ function blendProjection(
   const ppgZ = (stats.weightedPPG - ppgDist.mean) / ppgDist.stdDev;
   const opportunityZ =
     opportunityScore !== null ? (opportunityScore - opportunityDist.mean) / opportunityDist.stdDev : null;
-  // Consensus is a rank-based 0-1 score already comparable across the
-  // full ranked pool by construction (normalizeConsensusRank) — treated
-  // as its own z-equivalent centered at 0.5.
-  //
-  // KNOWN GAP (currently inert, not fixed): this +-2 cap is tighter than
-  // ppgZ/opportunityZ's real, unbounded z-scores (which routinely exceed
-  // +-2 for outlier players), so once rosConsensusService.ts stops being
-  // a stub, Component C's practical influence on the blend will run
-  // below its nominal 15% weight. Harmless today only because
-  // consensusScore is always null (no licensed consensus API access
-  // yet) — every real blend currently excludes this term entirely. Needs
-  // re-tuning against real consensus data before that data exists, not
-  // guessed at blind now.
-  const consensusZ = consensusScore !== null ? (consensusScore - 0.5) * 4 : null;
+  // Consensus's 0-1 score converts to a real z-score via probit (the
+  // inverse standard normal CDF), not a naive linear rescale — confirmed
+  // live with real 2026 draft consensus that a linear rescale of even a
+  // position-scoped percentile barely moves the blend (a real McCaffrey
+  // RB3 vs Gibbs RB1 gap produced a ~0.006 score difference on a 0-1
+  // scale, invisible next to ppgZ/opportunityZ's real range). probit
+  // preserves separation at the extremes the way real expert disagreement
+  // actually concentrates there — RB1 vs RB3 out of 222 ranked backs is a
+  // much bigger real signal than RB110 vs RB112, and this reflects that
+  // instead of treating every rank step as equally significant.
+  const consensusZ = consensusScore !== null ? probit(consensusScore) : null;
 
   const components: Array<[number | null, number]> = [
     [ppgZ, ROS_VALUATION_WEIGHTS.rosProjection],
@@ -245,7 +284,17 @@ export async function calculateAllROSAuctionValues(
     );
   }
 
-  const consensusPoolSize = consensusValues.size;
+  // Pool size MUST be scoped to the player's own position — a global
+  // cross-position count (~900+ players) is what compressed real
+  // top-of-market separation to nothing (see rosConsensusService.ts's
+  // ROSConsensusPlayer.fantasyProsRosRank doc comment for the confirmed
+  // real example).
+  const consensusPoolSizeByPosition = new Map<FantasyPosition, number>();
+  for (const consensusPlayer of consensusValues.values()) {
+    if (!isFantasyPosition(consensusPlayer.position ?? "")) continue;
+    const position = consensusPlayer.position as FantasyPosition;
+    consensusPoolSizeByPosition.set(position, (consensusPoolSizeByPosition.get(position) ?? 0) + 1);
+  }
 
   type PreDollar = {
     player: NFLPlayer;
@@ -274,7 +323,10 @@ export async function calculateAllROSAuctionValues(
       consensusValues.get(player.id) ??
       consensusValues.get(normalizePlayerName(player.fullName));
     const consensusRank = consensus?.fantasyProsRosRank ?? consensus?.pffRosRank ?? null;
-    const consensusScore = normalizeConsensusRank(consensusRank, consensusPoolSize);
+    const consensusScore = normalizeConsensusRank(
+      consensusRank,
+      consensusPoolSizeByPosition.get(player.position) ?? 0
+    );
 
     const rosProjection = blendProjection(
       player.position,

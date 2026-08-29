@@ -40,14 +40,39 @@ const FANTASYPROS_API_BASE_URL = "https://api.fantasypros.com/public/v2/json/nfl
 export type ROSConsensusPlayer = {
   sleeperId: string | null;
   name: string;
-  /** Consensus ROS rank — lower is better. Null fields are never filled with a guess. */
+  /** e.g. "RB", "WR" — needed so rank/pool size stay position-relative, not cross-position. */
+  position: string | null;
+  /**
+   * Consensus rank WITHIN this player's position (e.g. 3 for "the #3
+   * consensus RB") — lower is better. Deliberately NOT FantasyPros'
+   * overall rank_ecr: confirmed live (real 2026 draft rankings) that
+   * normalizing an overall rank against the full ~940-player
+   * cross-position pool compresses real separation among elite players
+   * at one position to near-nothing (a real 6-spot overall gap between
+   * two top backs became a ~0.006 score difference on a 0-1 scale) —
+   * exactly the kind of top-of-market signal Component C exists to
+   * provide. Position rank + a position-scoped pool size (see
+   * rosValuationService.ts) fixes this. Null fields are never filled
+   * with a guess.
+   */
   fantasyProsRosRank: number | null;
   pffRosRank: number | null;
 };
 
 type FantasyProsRankingsResponse = {
-  players: { player_name: string; rank_ecr: number }[];
+  players: {
+    player_name: string;
+    player_position_id: string;
+    /** e.g. "RB3" — position abbreviation followed by the position-specific rank. */
+    pos_rank: string;
+  }[];
 };
+
+/** Parses FantasyPros' "RB3"-style pos_rank into the numeric 3. Returns null if the format ever doesn't match (never guess a rank). */
+function parsePositionRank(posRank: string): number | null {
+  const match = /(\d+)$/.exec(posRank);
+  return match ? Number(match[1]) : null;
+}
 
 /**
  * DRAFT before the real season starts (FantasyPros doesn't refresh ROS
@@ -112,7 +137,8 @@ export async function getROSConsensusValues(): Promise<
       values.set(normalizePlayerName(player.player_name), {
         sleeperId: null,
         name: player.player_name,
-        fantasyProsRosRank: player.rank_ecr,
+        position: player.player_position_id ?? null,
+        fantasyProsRosRank: parsePositionRank(player.pos_rank),
         pffRosRank: null,
       });
     }
@@ -133,6 +159,14 @@ export async function getROSConsensusValues(): Promise<
  * (not 0) when no real consensus data exists, so callers can correctly
  * exclude this component from the blend rather than silently scoring a
  * real player as "worst possible" for lack of data.
+ *
+ * rank and poolSize must be from the SAME position pool (see
+ * ROSConsensusPlayer.fantasyProsRosRank's doc comment) — passing an
+ * overall cross-position rank/pool here reproduces the exact top-of-
+ * market compression bug this was fixed for. rosValuationService.ts
+ * additionally converts this 0-1 score into a real z-score (not a naive
+ * linear rescale) before blending, so separation among elite players
+ * survives all the way through.
  */
 export function normalizeConsensusRank(
   rank: number | null,
