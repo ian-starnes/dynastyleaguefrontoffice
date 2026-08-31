@@ -143,9 +143,21 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
     ringOfHonorQualifiersByOwnerId.set(entry.ownerId, list);
   }
 
+  const currentOwnersById = new Map(currentOwners.map((owner) => [owner.user_id, owner]));
+
   const profiles = new Map<string, ManagerProfile>();
 
-  for (const owner of currentOwners) {
+  // Real managers are exactly the franchises FranchiseValueService found
+  // — i.e. primary roster owners. getOwners() returns every Sleeper user
+  // attached to the league, which also includes co-owners (a real,
+  // confirmed case: a second account helping run an existing roster)
+  // who hold no roster of their own — iterating that list directly gave
+  // a co-owner their own phantom manager card with zero real stats, and
+  // inflated totalManagers past the real number of franchises (11 shown
+  // instead of the real 10).
+  for (const franchise of franchiseValuations) {
+    const owner = currentOwnersById.get(franchise.ownerId);
+    if (!owner) continue;
     const ownerId = owner.user_id;
     const ownerPerformances = performancesByOwnerId.get(ownerId) ?? [];
     const stats = careerStats.get(ownerId);
@@ -245,7 +257,7 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       // Ranks filled in below, once every profile exists to rank against.
       careerPointsForRank: 0,
       regularSeasonWinPercentageRank: 0,
-      totalManagers: currentOwners.length,
+      totalManagers: franchiseValuations.length,
     });
   }
 
