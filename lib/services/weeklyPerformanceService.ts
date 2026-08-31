@@ -4,11 +4,37 @@ import {
   getOwnersForLeague,
   getAllMatchupsForLeague,
   getSleeperLeagueId,
+  getNflState,
+  type SleeperNflState,
 } from "@/lib/sleeper";
 import { normalizeWeekMatchups } from "@/lib/import/normalizer";
 import { getFranchiseIdentityMap, canonicalizeOwnerId } from "./franchiseIdentityService";
 import { WEEKLY_RESULT_CORRECTIONS } from "@/lib/config/historicalResultCorrections";
 import type { WeeklyPerformance } from "@/lib/models";
+
+const MAX_WEEK = 18;
+
+/**
+ * How many weeks of the CURRENT, still-in-progress season actually have
+ * real, decided games — confirmed live (once this league's 2026 season
+ * actually started) that Sleeper pre-generates the FULL season's
+ * matchup schedule the moment it begins: every week 1-18 already
+ * returns a real, non-empty matchup slate with real roster pairings,
+ * just at a placeholder 0.0 score until that week is actually played.
+ * That directly contradicts this file's own prior assumption ("a week
+ * with no games yet returns an empty array") — true for a future week
+ * of a fully PAST season (which never generates a slate at all), but
+ * not for a future week of the season that's happening right now. Left
+ * unhandled, every one of those placeholder weeks gets counted as a
+ * real decided 0-0 tie for all 10 teams — confirmed live at 180 phantom
+ * rows the moment the 2026 season began — corrupting every career stat,
+ * standing, and record until the real season catches up week by week.
+ */
+function completedWeeksForCurrentSeason(state: SleeperNflState): number {
+  if (state.season_type === "regular") return Math.max(0, state.week - 1);
+  if (state.season_type === "post") return MAX_WEEK; // the real regular season has fully concluded by the time real playoffs start
+  return 0; // preseason/offseason — nothing in the current season has actually been played yet
+}
 
 /**
  * Applies any explicit, confirmed override from historicalResultCorrections.ts
@@ -82,10 +108,15 @@ export type OwnerWeeklyPerformance = WeeklyPerformance & {
  */
 export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance[]> {
   const rootLeagueId = getSleeperLeagueId();
-  const [seasonChain, franchiseIdentity] = await Promise.all([
+  const [seasonChain, franchiseIdentity, nflState] = await Promise.all([
     getLeagueSeasonChain(rootLeagueId),
     getFranchiseIdentityMap(),
+    getNflState(),
   ]);
+  // Only the LAST (most recent) season in the chain can possibly still
+  // be in progress — every earlier one is, by definition, fully over.
+  const currentLeagueId = seasonChain[seasonChain.length - 1].league_id;
+  const currentSeasonCompletedThroughWeek = completedWeeksForCurrentSeason(nflState);
 
   const perSeason = await Promise.all(
     seasonChain.map(async (league) => {
@@ -122,6 +153,9 @@ export async function getAllWeeklyPerformances(): Promise<OwnerWeeklyPerformance
 
       for (const { week, matchups } of weeks) {
         if (matchups.length === 0) continue;
+        if (league.league_id === currentLeagueId && week > currentSeasonCompletedThroughWeek) {
+          continue;
+        }
 
         for (const rawPerformance of normalizeWeekMatchups(
           league.league_id,
