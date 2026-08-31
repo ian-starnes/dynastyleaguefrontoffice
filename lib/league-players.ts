@@ -1,4 +1,4 @@
-import { getPlayers, getRosters, getOwners, type NFLPlayer } from "./sleeper";
+import { getPlayers, getRosters, getOwners, getLeague, type NFLPlayer } from "./sleeper";
 import { normalizePlayerName } from "./services/fantasycalc";
 import { getFantasyProsValues } from "./services/fantasypros";
 import { calculateAssetEconomics, MAX_KEEPER_YEARS } from "./services/assetCalculator";
@@ -106,6 +106,7 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
   const players = await getPlayers();
 
   const [
+    league,
     [rosters, owners],
     rosAuctionValues,
     fantasyProsValues,
@@ -113,6 +114,7 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     keeperClocks,
     contractLineages,
   ] = await Promise.all([
+    getLeague(),
     Promise.all([getRosters(), getOwners()]),
     // The ROS valuation engine is supplementary, not essential — if a
     // real Sleeper stats fetch inside it fails, every player just shows
@@ -183,13 +185,19 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     const rosValuation = rosAuctionValues.get(nflPlayer.id);
     const marketValueInput = rosValuation?.auctionValue ?? null;
 
-    const priorSeason = priorSeasonAuctionData?.season ?? 2025;
-    const currentSeason = priorSeason + 1;
+    // The real current season, independent of whatever season the real
+    // auction data happens to come from — NOT derived as "auction season
+    // + 1" (a confirmed bug: once this season's own draft completes,
+    // priorSeasonAuctionData.season IS the current season, and assuming
+    // it's always one year behind would silently push every date a year
+    // into the future).
+    const currentSeason = Number(league.season);
 
+    const auctionSeason = priorSeasonAuctionData?.season;
     const realAuctionPrice = priorSeasonAuctionData?.pricesByPlayerId.get(
       nflPlayer.id
     );
-    // Undrafted (no real prior-season price) splits two ways: a free
+    // Undrafted (no real auction price on record) splits two ways: a free
     // agent nobody currently holds has acquisition value $0 — there's no
     // keeper decision to price, since no one is keeping them. Only a
     // ROSTERED undrafted player (a waiver/free-agent pickup someone is
@@ -199,10 +207,16 @@ export async function getLeaguePlayers(): Promise<LeaguePlayer[]> {
     // claim it's already happened.
     const originalAuctionPrice =
       realAuctionPrice ?? (ownerId !== null ? UNDRAFTED_CONTRACT_PRICE : 0);
-    // Real prices come from exactly one season back (priorSeason); the $5
-    // undrafted convention is a fresh, as-of-now price (currentSeason) —
-    // so yearsSincePriceSet is 1 for the former, 0 for the latter.
-    const draftYear = realAuctionPrice !== undefined ? priorSeason : currentSeason;
+    // A real price is dated to whichever season it actually came from
+    // (this season's own completed auction, or last season's if this
+    // season hasn't drafted yet — see auctionHistoryService.ts); the $5
+    // undrafted convention is always a fresh, as-of-now price. So
+    // yearsSincePriceSet is usually 0 right after a draft, ticking up
+    // each offseason until the next one.
+    const draftYear =
+      realAuctionPrice !== undefined && auctionSeason !== undefined
+        ? auctionSeason
+        : currentSeason;
     const yearsSincePriceSet = currentSeason - draftYear;
 
     const keeperYearsRemaining =
