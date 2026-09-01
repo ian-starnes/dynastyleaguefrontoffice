@@ -9,18 +9,23 @@ export function sortRows<T>(
   if (!column?.sortValue) return rows;
   const sortValue = column.sortValue;
 
-  const sorted = [...rows].sort((a, b) => {
+  // Compares ascending, then negates for desc — rather than sorting
+  // ascending and reversing the whole array, which would also flip the
+  // relative order of tied rows (breaking stability: two rows with equal
+  // sort values would swap places depending on direction alone).
+  const comparisonDirection = sort.direction === "desc" ? -1 : 1;
+
+  return [...rows].sort((a, b) => {
     const aValue = sortValue(a);
     const bValue = sortValue(b);
 
-    if (typeof aValue === "number" && typeof bValue === "number") {
-      return aValue - bValue;
-    }
+    const comparison =
+      typeof aValue === "number" && typeof bValue === "number"
+        ? aValue - bValue
+        : String(aValue).localeCompare(String(bValue));
 
-    return String(aValue).localeCompare(String(bValue));
+    return comparison * comparisonDirection;
   });
-
-  return sort.direction === "desc" ? sorted.reverse() : sorted;
 }
 
 export function nextSortState(current: SortState, columnId: string): SortState {

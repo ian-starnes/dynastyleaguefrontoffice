@@ -43,9 +43,12 @@ export default async function TeamDetailPage({
         <StatTile
           label="Franchise Value"
           value={formatDollarValue(summary.franchiseValue)}
+        />
+        <StatTile
+          label="Roster Asset Value"
+          value={formatDollarValue(summary.rosterAssetValue)}
           valueClassName="text-gold"
         />
-        <StatTile label="Roster Asset Value" value={formatDollarValue(summary.rosterAssetValue)} />
         <StatTile
           label="Future Draft/Auction Capital"
           value={formatDollarValue(summary.futurePickValue)}

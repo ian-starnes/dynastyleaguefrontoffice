@@ -112,8 +112,6 @@ export default async function HomePage() {
         <StatTile
           label="Franchise Value"
           value={formatDollarValue(summary.franchiseValue)}
-          valueClassName="text-gold"
-          sublabel={`Rank #${summary.franchiseValueRank} of ${summary.totalFranchises}`}
         />
         <StatTile
           label="Current Season Rank"
@@ -123,6 +121,8 @@ export default async function HomePage() {
         <StatTile
           label="Roster Asset Value"
           value={formatDollarValue(summary.rosterAssetValue)}
+          valueClassName="text-gold"
+          sublabel={`Rank #${summary.franchiseValueRank} of ${summary.totalFranchises}`}
         />
         <StatTile
           label="Total Keeper Surplus"

@@ -24,8 +24,14 @@ const COLUMNS: Column<FranchiseValuation>[] = [
     id: "rosterAssetValue",
     header: "Roster Asset Value",
     sortable: true,
+    // What Rank is actually based on — see franchiseValueService.ts. Same
+    // gold/bold treatment as Asset Value at the player level.
     sortValue: (row) => row.rosterAssetValue,
-    render: (row) => formatDollarValue(row.rosterAssetValue),
+    render: (row) => (
+      <span className="text-base font-semibold text-gold">
+        {formatDollarValue(row.rosterAssetValue)}
+      </span>
+    ),
   },
   {
     id: "futurePickValue",
@@ -38,14 +44,8 @@ const COLUMNS: Column<FranchiseValuation>[] = [
     id: "franchiseValue",
     header: "Franchise Value",
     sortable: true,
-    // DLFO's primary franchise-level ranking — same gold/bold treatment
-    // as Asset Value at the player level.
     sortValue: (row) => row.franchiseValue,
-    render: (row) => (
-      <span className="text-base font-semibold text-gold">
-        {formatDollarValue(row.franchiseValue)}
-      </span>
-    ),
+    render: (row) => formatDollarValue(row.franchiseValue),
   },
 ];
 
@@ -64,7 +64,7 @@ export function FranchiseRankingsTable({
   franchises: FranchiseValuation[];
 }) {
   const [sort, setSort] = useState<SortState>({
-    columnId: "franchiseValue",
+    columnId: "rosterAssetValue",
     direction: "desc",
   });
 

@@ -8,12 +8,16 @@ export type FranchiseValuation = {
   rosterAssetValue: number;
   futurePickValue: number;
   franchiseValue: number;
-  /** 1 = highest Franchise Value in the league. */
+  /**
+   * 1 = strongest real roster (highest Roster Asset Value) in the league.
+   * Deliberately NOT based on franchiseValue — see getFranchiseValuations()
+   * for why blending in Future Pick Value would distort this.
+   */
   rank: number;
 };
 
 export type LeagueEconomicsSummary = {
-  /** Ranked by Franchise Value descending. */
+  /** Ranked by real Roster Asset Value descending — see getFranchiseValuations(). */
   franchises: FranchiseValuation[];
   /** Across every currently-rostered player in the league. */
   averageAssetValue: number;
@@ -33,8 +37,17 @@ export type LeagueEconomicsSummary = {
  */
 export class FranchiseValueService {
   /**
-   * Per-franchise valuations, ranked by Franchise Value descending. The
-   * reusable core this whole service (and future ones) builds on.
+   * Per-franchise valuations, ranked by real Roster Asset Value descending
+   * — NOT by the blended franchiseValue total. Future Pick Value is a
+   * structural auction-budget number: every owner defaults to the same
+   * $200/year, adjusted only by real traded-round credits, so it's
+   * inherently near-flat across the whole league (confirmed real spread
+   * ~$150) next to Roster Asset Value's real, player-driven spread
+   * (confirmed ~$303). Ranking by the summed total let that flat
+   * component swamp genuine roster-quality differences — 5 of 10 teams'
+   * ranks changed depending on whether picks were included. franchiseValue
+   * itself is still computed and shown as an informational total; only
+   * what determines `rank` changed.
    */
   async getFranchiseValuations(): Promise<FranchiseValuation[]> {
     const [players, rosters, owners, projectedBudgets] = await Promise.all([
@@ -93,7 +106,7 @@ export class FranchiseValueService {
           franchiseValue: rosterAssetValue + futurePickValue,
         };
       })
-      .sort((a, b) => b.franchiseValue - a.franchiseValue)
+      .sort((a, b) => b.rosterAssetValue - a.rosterAssetValue)
       .map((valuation, index) => ({ ...valuation, rank: index + 1 }));
   }
 
