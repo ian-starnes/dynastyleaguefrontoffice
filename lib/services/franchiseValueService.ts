@@ -5,14 +5,15 @@ import { getProjectedAuctionBudgets } from "./futurePicksService";
 export type FranchiseValuation = {
   ownerId: string;
   ownerName: string;
-  rosterAssetValue: number;
+  rosterMarketValue: number;
   futurePickValue: number;
   franchiseValue: number;
   /**
-   * 1 = highest Franchise Value (real asset value of every player PLUS
-   * every currently-held future pick, summed) in the league. Both
-   * components are genuine, differentiated real-dollar valuations — see
-   * getFranchiseValuations() — so both count toward rank.
+   * 1 = highest Franchise Value (real market value of every rostered
+   * player PLUS every currently-held future pick, summed) in the league.
+   * Deliberately real Market Value, not the surplus-adjusted Asset Value
+   * (lib/services/assetCalculator.ts) — see getFranchiseValuations() for
+   * why.
    */
   rank: number;
 };
@@ -39,13 +40,22 @@ export type LeagueEconomicsSummary = {
 export class FranchiseValueService {
   /**
    * Per-franchise valuations, ranked by Franchise Value descending —
-   * real player Asset Value (lib/services/assetCalculator.ts) plus real
-   * pick value (lib/services/futurePicksService.ts) currently held,
-   * summed. Both halves are genuine, live-data-driven dollar figures —
-   * Future Pick Value isn't a placeholder or a flat guess, it's each
-   * owner's real $200/season auction entitlement adjusted by actual
-   * Sleeper-recorded pick trades — so both belong in one real total
-   * asset valuation, not just the player half of it.
+   * real player Market Value (the live ROS valuation engine's output,
+   * lib/league-players.ts) plus real pick value
+   * (lib/services/futurePicksService.ts) currently held, summed.
+   *
+   * Deliberately Market Value here, NOT Asset Value. Asset Value
+   * (lib/services/assetCalculator.ts: 2*marketValue - keeperCost) is a
+   * contract-EFFICIENCY metric — it can go arbitrarily negative for a
+   * real, valuable player on an overpriced keeper contract, which is
+   * correct for showing "did this team overpay" but wrong for "how good
+   * is this roster": a team that overpaid for a genuinely good player
+   * would get penalized as if the player himself were worthless.
+   * Confirmed live: one team's Asset-Value sum bottomed out near $0
+   * almost entirely because of a single $33 keeper (real market value
+   * $1) — a real bad contract, but not evidence the roster itself has
+   * ~$0 of real value. Market Value has no such contract-cost penalty,
+   * so it's the right basis for "what is this team actually worth."
    */
   async getFranchiseValuations(): Promise<FranchiseValuation[]> {
     const [players, rosters, owners, projectedBudgets] = await Promise.all([
@@ -62,15 +72,18 @@ export class FranchiseValueService {
       ])
     );
 
-    // Total Roster Asset Value: sum of every rostered player's Asset
-    // Value, grouped by owner.
-    const rosterAssetValueByOwnerId = new Map<string, number>();
+    // Total Roster Market Value: sum of every rostered player's real
+    // Market Value (from the live ROS valuation engine), grouped by
+    // owner. Null for a player with no real valuation yet (e.g. a
+    // rookie with zero recorded games) — excluded rather than fabricated,
+    // same rule the engine itself follows.
+    const rosterMarketValueByOwnerId = new Map<string, number>();
     for (const player of players) {
-      if (!player.currentOwnerId || player.assetValue === null) continue;
-      rosterAssetValueByOwnerId.set(
+      if (!player.currentOwnerId || player.marketValue === null) continue;
+      rosterMarketValueByOwnerId.set(
         player.currentOwnerId,
-        (rosterAssetValueByOwnerId.get(player.currentOwnerId) ?? 0) +
-          player.assetValue
+        (rosterMarketValueByOwnerId.get(player.currentOwnerId) ?? 0) +
+          player.marketValue
       );
     }
 
@@ -93,15 +106,15 @@ export class FranchiseValueService {
       )
       .map((roster) => {
         const ownerId = roster.owner_id;
-        const rosterAssetValue = rosterAssetValueByOwnerId.get(ownerId) ?? 0;
+        const rosterMarketValue = rosterMarketValueByOwnerId.get(ownerId) ?? 0;
         const futurePickValue = futurePickValueByOwnerId.get(ownerId) ?? 0;
 
         return {
           ownerId,
           ownerName: ownerNameByUserId.get(ownerId) ?? "Unknown",
-          rosterAssetValue,
+          rosterMarketValue,
           futurePickValue,
-          franchiseValue: rosterAssetValue + futurePickValue,
+          franchiseValue: rosterMarketValue + futurePickValue,
         };
       })
       .sort((a, b) => b.franchiseValue - a.franchiseValue)

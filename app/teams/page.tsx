@@ -26,7 +26,7 @@ export default async function TeamsPage() {
                   {formatDollarValue(team.franchiseValue)}
                 </p>
                 <p className="mt-1 text-xs text-ink/50">
-                  Roster {formatDollarValue(team.rosterAssetValue)} · Picks{" "}
+                  Roster {formatDollarValue(team.rosterMarketValue)} · Picks{" "}
                   {formatDollarValue(team.futurePickValue)}
                 </p>
               </Card>

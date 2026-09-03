@@ -19,7 +19,7 @@ export type FrontOfficeSummary = {
   franchiseValueRank: number;
   totalFranchises: number;
   currentSeasonRank: number | null;
-  rosterAssetValue: number;
+  rosterMarketValue: number;
   futurePickValue: number;
   /** The brief asks for the next 3 years specifically (e.g. 2027/2028/2029 from a 2026 current season). */
   projectedAuctionBudgetBySeason: { season: number; value: number }[];
@@ -142,7 +142,7 @@ export async function getFrontOfficeSummary(
     franchiseValueRank: myValuation.rank,
     totalFranchises: valuations.length,
     currentSeasonRank: myStanding?.rank ?? null,
-    rosterAssetValue: myValuation.rosterAssetValue,
+    rosterMarketValue: myValuation.rosterMarketValue,
     futurePickValue: myValuation.futurePickValue,
     projectedAuctionBudgetBySeason,
     totalKeeperSurplus,

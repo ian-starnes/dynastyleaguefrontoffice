@@ -46,8 +46,8 @@ export default async function TeamDetailPage({
           valueClassName="text-gold"
         />
         <StatTile
-          label="Roster Asset Value"
-          value={formatDollarValue(summary.rosterAssetValue)}
+          label="Roster Market Value"
+          value={formatDollarValue(summary.rosterMarketValue)}
         />
         <StatTile
           label="Future Draft/Auction Capital"

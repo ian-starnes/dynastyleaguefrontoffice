@@ -21,11 +21,11 @@ const COLUMNS: Column<FranchiseValuation>[] = [
     render: (row) => <span className="font-medium text-ink">{row.ownerName}</span>,
   },
   {
-    id: "rosterAssetValue",
-    header: "Roster Asset Value",
+    id: "rosterMarketValue",
+    header: "Roster Market Value",
     sortable: true,
-    sortValue: (row) => row.rosterAssetValue,
-    render: (row) => formatDollarValue(row.rosterAssetValue),
+    sortValue: (row) => row.rosterMarketValue,
+    render: (row) => formatDollarValue(row.rosterMarketValue),
   },
   {
     id: "futurePickValue",
@@ -38,8 +38,8 @@ const COLUMNS: Column<FranchiseValuation>[] = [
     id: "franchiseValue",
     header: "Franchise Value",
     sortable: true,
-    // What Rank is based on — real player Asset Value plus real held Pick
-    // Value, summed. Same gold/bold treatment as Asset Value at the
+    // What Rank is based on — real player Market Value plus real held
+    // Pick Value, summed. Same gold/bold treatment as Asset Value at the
     // player level.
     sortValue: (row) => row.franchiseValue,
     render: (row) => (
