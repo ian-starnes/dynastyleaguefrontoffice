@@ -1,12 +1,19 @@
-import { getWeeklyStats, getNflState, getPlayers, type NFLPlayer, type SleeperWeeklyStat, type SleeperWeeklyStatsMap } from "@/lib/sleeper";
+import { getWeeklyStats, getSeasonProjections, getNflState, getPlayers, type NFLPlayer, type SleeperWeeklyStat, type SleeperWeeklyStatsMap, type SleeperSeasonProjectionsMap } from "@/lib/sleeper";
 import { RECENCY_WEIGHTING } from "@/lib/config/rosValuationConfig";
 
 export type ROSStats = {
   playerId: string;
   gamesPlayed: number;
-  /** Recency-weighted PPG — the core rest-of-season production estimate (brief's Component A). Never season-long PPG alone. */
+  /**
+   * Recency-weighted PPG — the core rest-of-season production estimate
+   * (brief's Component A). Never season-long PPG alone. Before this
+   * season has any real games of its own (weeksUsed === 0), this is
+   * instead a real, live 2026 season projection (see getROSStats' doc
+   * comment) — still a genuine forward-looking PPG figure, just not
+   * derived from completed box scores.
+   */
   weightedPPG: number;
-  /** Unweighted season PPG, kept only for transparency/comparison — never used as the projection itself. */
+  /** Unweighted season PPG, kept only for transparency/comparison — never used as the projection itself. Equal to weightedPPG when sourced from a projection (weeksUsed === 0), since there's only one real figure to compare against. */
   seasonPPG: number;
   /** Player's share of their team's total targets across the weeks in scope. Null for non-pass-catchers or teams with zero recorded targets. */
   targetShare: number | null;
@@ -22,8 +29,9 @@ export type ROSStats = {
   passAttemptShare: number | null;
   /** Player's share of their team's total receiving air yards — the "downfield role" signal the brief calls out for WRs specifically. */
   airYardShare: number | null;
-  /** Which season this projection is actually drawn from — see getROSStats' doc comment for why this can be last season, not this one. */
+  /** Which season this figure is actually drawn from — always the CURRENT season now (see getROSStats' doc comment); never a completed prior season. */
   seasonUsed: number;
+  /** How many real completed weeks this is derived from. 0 means this came from a real 2026 season projection instead — no completed weeks exist yet to derive it from. */
   weeksUsed: number;
 };
 
@@ -68,17 +76,30 @@ function emptyTeamTotals(): TeamTotals {
  * full season (all MAX_WEEK weeks) is the most recent real baseline, NOT
  * state.previous_season (a confirmed bug: the original "regular" check
  * missed "post" entirely and fell back a full extra year stale during
- * every real NFL playoff window). Only genuine preseason — no
- * current-season regular-season data exists at all yet — falls back to
- * the most recently COMPLETED season's full year. Either way, recency
- * weighting is always applied to whichever weeks are in scope (fixed
- * from an earlier version that skipped weighting entirely in the
- * fallback case — a real bug the first verification pass surfaced: a
- * player who struggled early in the fallback season but finished strong
- * was getting dragged down by an unweighted full-season average instead
- * of reflecting their more recent, more predictive form). The preseason
- * fallback itself remains a real, stated limitation — not a fabrication
- * — and seasonUsed on every result tells the caller which case they're in.
+ * every real NFL playoff window). Recency weighting is always applied to
+ * whichever weeks are in scope (fixed from an earlier version that
+ * skipped weighting entirely in a fallback case — a real bug the first
+ * verification pass surfaced: a player who struggled early but finished
+ * strong was getting dragged down by an unweighted average instead of
+ * reflecting their more recent, more predictive form).
+ *
+ * NO REAL CURRENT-SEASON GAMES YET (genuine preseason, or regular week 1
+ * before it's actually been played): this used to fall back to the most
+ * recently COMPLETED prior season's full-year stats — a real, stated
+ * limitation, not a fabrication, but still last year's players/roles/
+ * teams standing in for this year's. Confirmed live (2026-09-03) that
+ * Sleeper exposes a real, forward-looking projections endpoint for the
+ * CURRENT season instead (getSeasonProjections — same URL shape as
+ * getWeeklyStats, /stats/nfl/... -> /projections/nfl/..., unauthenticated,
+ * confirmed genuine by its fractional values like rush_att: 17.64, which
+ * only a projection model produces, never a completed game). This now
+ * uses that real 2026 projection in place of the 2025 fallback — see
+ * buildROSStatsFromProjections. The one real limitation: Sleeper's
+ * projections payload carries no opportunity-share fields (targets,
+ * snaps, red-zone, air yards) at all, so every share field on the
+ * result is null during this window — Component B correctly renormalizes
+ * away rather than being backfilled with a stale 2025 proxy that would
+ * reintroduce the exact "not actually 2026" problem this was fixed for.
  *
  * KNOWN LIMITATION (not fixed, documented instead): team-level share
  * metrics (targetShare, snapShare, etc.) attribute every week in scope
@@ -111,8 +132,10 @@ export async function getROSStats(
     seasonUsed = currentSeason;
     weeksInScope = Array.from({ length: MAX_WEEK }, (_, i) => i + 1);
   } else {
-    seasonUsed = Number(state.previous_season);
-    weeksInScope = Array.from({ length: MAX_WEEK }, (_, i) => i + 1);
+    // No real games exist yet for the CURRENT season — use a real 2026
+    // projection instead of a completed PRIOR season's stats. See the
+    // "NO REAL CURRENT-SEASON GAMES YET" section above.
+    return buildROSStatsFromProjections(currentSeason);
   }
 
   const [weeklyStatsByWeek, players] = await Promise.all([
@@ -257,6 +280,59 @@ export async function getROSStats(
     const existing = results.get(playerId);
     if (!existing) continue;
     existing.snapShare = snaps.team > 0 ? snaps.own / snaps.team : null;
+  }
+
+  return results;
+}
+
+/**
+ * Builds ROSStats from a real 2026 season projection instead of
+ * completed box scores — see getROSStats' "NO REAL CURRENT-SEASON GAMES
+ * YET" doc comment for why and when this runs. Deliberately much
+ * simpler than the trailing-stats path above: there's no per-week
+ * recency weighting to apply (a season-long projection is already one
+ * single forward-looking figure, not a series of real weeks to weight),
+ * and no team-relative share metrics to compute (Sleeper's projections
+ * payload — confirmed live — carries no target/snap/red-zone/air-yard
+ * fields at all, only points and core volume stats), so every share
+ * field is left null rather than backfilled from a stale prior-season
+ * proxy. blendProjection (rosValuationService.ts) already renormalizes
+ * across whichever components have real data, so a null
+ * opportunityScore here correctly falls back to Components A+C only.
+ */
+async function buildROSStatsFromProjections(season: number): Promise<Map<string, ROSStats>> {
+  const projections = await getSeasonProjections(season, "regular").catch(
+    (error: unknown) => {
+      console.error(
+        `Season projections fetch failed for ${season}, treating as no data:`,
+        error
+      );
+      return {} as SleeperSeasonProjectionsMap;
+    }
+  );
+
+  const results = new Map<string, ROSStats>();
+  for (const [playerId, projection] of Object.entries(projections)) {
+    const gamesPlayed = projection.gp ?? 0;
+    if (gamesPlayed <= 0) continue; // no real projected role this season — never fabricate a value
+
+    const weightedPPG = (projection.pts_half_ppr ?? 0) / gamesPlayed;
+
+    results.set(playerId, {
+      playerId,
+      gamesPlayed,
+      weightedPPG,
+      seasonPPG: weightedPPG,
+      targetShare: null,
+      snapShare: null,
+      redZoneTargetShare: null,
+      rushAttemptShare: null,
+      rushRedZoneAttemptShare: null,
+      passAttemptShare: null,
+      airYardShare: null,
+      seasonUsed: season,
+      weeksUsed: 0,
+    });
   }
 
   return results;

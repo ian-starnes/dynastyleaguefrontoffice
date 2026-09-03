@@ -28,8 +28,11 @@ export {
 } from "./brackets";
 export {
   getWeeklyStats,
+  getSeasonProjections,
   getNflState,
   type SleeperWeeklyStat,
   type SleeperWeeklyStatsMap,
+  type SleeperSeasonProjection,
+  type SleeperSeasonProjectionsMap,
   type SleeperNflState,
 } from "./stats";

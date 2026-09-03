@@ -47,6 +47,45 @@ export async function getWeeklyStats(
   );
 }
 
+/**
+ * Confirmed live (direct API check, 2026-09-03) that this is a real,
+ * forward-looking projection, not disguised historical stats: fields
+ * like rush_att/rush_td carry FRACTIONAL values (e.g. 17.64, 0.6) that
+ * are only possible from a projection model — a real completed game
+ * always has integer counts. Unauthenticated, same as every other
+ * Sleeper endpoint. Deliberately typed narrowly to only the fields
+ * rosStatsService.ts actually reads — the real payload has many more
+ * (ADP variants, per-distance reception buckets, etc.) that aren't
+ * needed here. No opportunity-share fields (targets, snaps, red-zone,
+ * air yards) exist in this payload at all — confirmed by inspecting the
+ * full real response — so this can only feed a production/points
+ * signal, never the opportunity composite.
+ */
+export type SleeperSeasonProjection = {
+  /** Projected games played this season — 0 or absent means no real projected role (e.g. season-ending injury). */
+  gp?: number;
+  pts_half_ppr?: number;
+};
+
+export type SleeperSeasonProjectionsMap = Record<string, SleeperSeasonProjection>;
+
+/**
+ * A full season's projected production, keyed by player_id — the real
+ * sibling of getWeeklyStats's URL shape (/stats/nfl/... ->
+ * /projections/nfl/...), just with no trailing /{week} segment for the
+ * season-long aggregate. Used by rosStatsService.ts only when the
+ * current season has no real games of its own yet.
+ */
+export async function getSeasonProjections(
+  season: number,
+  seasonType: "regular" | "pre" | "post" = "regular"
+): Promise<SleeperSeasonProjectionsMap> {
+  return sleeperFetch<SleeperSeasonProjectionsMap>(
+    `/projections/nfl/${seasonType}/${season}`,
+    { next: { revalidate: 3600 } }
+  );
+}
+
 export type SleeperNflState = {
   week: number;
   season: string;

@@ -14,17 +14,31 @@
  * No code here special-cases either tier; it just processes whatever
  * data.players comes back, so the upgrade needed no changes.
  *
- * Confirmed live which ranking "type" to request and when:
- *   - Their "ROS" type is only actively maintained DURING a season — as
- *     of the 2026 preseason, it still returned 2025 season data
- *     (last_updated "12/25", a full season stale), not a real current
- *     signal.
+ * Confirmed live which ranking "type" to request and when — and this
+ * has genuinely changed over the course of the 2026 preseason, so don't
+ * trust an old snapshot of this comment over a fresh live check:
+ *   - Earlier in the 2026 preseason, "ROS" type literally returned 2025
+ *     season data (last_updated "12/25", a full season stale) — their
+ *     real ROS product wasn't active yet.
+ *   - Re-confirmed live 2026-09-03 (season_type already "regular" per
+ *     Sleeper, 6 days before actual kickoff): requesting type=ROS now
+ *     returns FRESH current data — but via an undocumented fallback,
+ *     not because their real ROS product activated. The response's own
+ *     metadata says so explicitly: `type: "Draft Half PPR"`,
+ *     `fallback_for: "ROS"` — FantasyPros is silently substituting
+ *     live DRAFT rankings whenever ROS is requested this early. Verified
+ *     the content itself is genuinely current, not just fresh-looking:
+ *     it correctly reflects Stefon Diggs's real move to Washington
+ *     (a 2026 offseason signing), not his prior team.
  *   - Their "DRAFT" type (redraft startup rankings) IS actively
  *     maintained pre-season (confirmed last_updated "8/25" for the 2026
  *     season, current as of testing).
  * So this uses DRAFT rankings before the real NFL regular season starts,
- * and switches to ROS rankings once it has (see resolveRankingsRequest) —
- * per explicit direction, not a guess.
+ * and switches to ROS rankings once it has (see resolveRankingsRequest).
+ * Practically this makes little difference right now — both requests
+ * currently resolve to the same fresh FantasyPros content — but the
+ * request TYPE sent still matters for whenever their real ROS product
+ * does activate independently of the DRAFT fallback.
  *
  * PFF: no public self-serve API for ROS rankings (same finding as
  * lib/services/pff.ts) — PFF's rankings/projections products are
