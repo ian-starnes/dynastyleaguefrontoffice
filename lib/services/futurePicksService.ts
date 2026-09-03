@@ -3,22 +3,44 @@ import {
   getRosters,
   getTradedPicksForLeague,
   getSleeperLeagueId,
+  getDraftsForLeague,
 } from "@/lib/sleeper";
 import { getAuctionBudgetCredit } from "@/lib/config/auctionBudgetAppendixA";
 
 /**
- * How many upcoming draft classes to project, starting with the current
- * season (included even if it hasn't happened yet — verified this
- * league's 2026 rookie draft is still "pre_draft"). Set to 4 so this
- * covers currentSeason (2026) through 2029 — the DLFO brief's section 14
- * explicitly asks for every team to show projected budgets for 2027,
- * 2028, and 2029. This league's own traded_picks data only ever
- * references up to 2 years out at the time this was checked, so further-
- * out years will mostly show each roster still holding its own original
- * picks — a correct default (Sleeper has no trade to override), not a
- * gap.
+ * How many draft classes to consider as candidates for "future," starting
+ * with the current season — the loop below drops the current season from
+ * this window once its own real draft has completed (see
+ * hasCurrentSeasonDrafted), so this stays 4 rather than 3: it needs to
+ * cover BOTH the case where the current season hasn't drafted yet (a
+ * real future asset, include it) and the common case where it has
+ * (exclude it, leaving exactly 3 real future years — currentSeason+1
+ * through currentSeason+3 — matching the DLFO brief's section 14
+ * requirement to show every team's next 3 years). This league's own
+ * traded_picks data only ever references up to 2 years out at the time
+ * this was checked, so further-out years will mostly show each roster
+ * still holding its own original picks — a correct default (Sleeper has
+ * no trade to override), not a gap.
  */
 const FUTURE_DRAFT_YEARS_TO_PROJECT = 4;
+
+/**
+ * Whether the CURRENT season's own real draft has already happened.
+ * Confirmed live (direct API check across 2023-2026) that this league
+ * runs exactly ONE draft object per season, type "auction" — there's no
+ * separate rookie/snake draft. The numbered-round "future pick" credits
+ * this file tracks (Appendix A) are a trade-value convention layered on
+ * top of that single real event, not a second draft to check. Once that
+ * season's auction is complete, its picks already turned into real
+ * roster spots this year — they're no longer a FUTURE asset to project,
+ * they're history. Only ever relevant for the CURRENT season: every
+ * later season (currentSeason+1 and beyond) has no league object yet in
+ * Sleeper at all, so it can't possibly have already drafted.
+ */
+async function hasCurrentSeasonDrafted(leagueId: string): Promise<boolean> {
+  const drafts = await getDraftsForLeague(leagueId);
+  return drafts.some((draft) => draft.type === "auction" && draft.status === "complete");
+}
 
 export type FuturePick = {
   season: number;
@@ -41,10 +63,11 @@ export type FuturePick = {
 export async function getFuturePicks(): Promise<FuturePick[]> {
   const leagueId = getSleeperLeagueId();
 
-  const [league, rosters, tradedPicks] = await Promise.all([
+  const [league, rosters, tradedPicks, currentSeasonDrafted] = await Promise.all([
     getLeague(),
     getRosters(),
     getTradedPicksForLeague(leagueId),
+    hasCurrentSeasonDrafted(leagueId),
   ]);
 
   const currentSeason = Number(league.season);
@@ -58,8 +81,12 @@ export async function getFuturePicks(): Promise<FuturePick[]> {
     );
   }
 
+  // Start the FUTURE window at next season, not this one, once this
+  // season's own draft has already happened — see hasCurrentSeasonDrafted.
+  const firstFutureYearsOut = currentSeasonDrafted ? 1 : 0;
+
   const picks: FuturePick[] = [];
-  for (let yearsOut = 0; yearsOut < FUTURE_DRAFT_YEARS_TO_PROJECT; yearsOut++) {
+  for (let yearsOut = firstFutureYearsOut; yearsOut < FUTURE_DRAFT_YEARS_TO_PROJECT; yearsOut++) {
     const season = currentSeason + yearsOut;
 
     for (let round = 1; round <= draftRounds; round++) {
