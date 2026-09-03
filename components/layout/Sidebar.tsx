@@ -26,8 +26,8 @@ export function Sidebar() {
           onClick={() => setIsMobileMenuOpen(false)}
         >
           <span aria-hidden className="h-7 w-[3px] rounded-full bg-gold" />
-          <span className="font-serif text-2xl font-semibold tracking-tight text-primary">
-            DLFO
+          <span className="font-serif text-xl font-semibold tracking-tight text-primary">
+            Dynasty League Hub
           </span>
         </Link>
         <button
@@ -51,14 +51,14 @@ export function Sidebar() {
         }`}
       >
         <Link href="/" className="hidden items-center gap-3 lg:flex">
-          {/* Stand-in brand mark until a real wordmark/logo exists */}
+          {/* Stand-in brand mark until the real league crest is added */}
           <span aria-hidden className="h-8 w-[3px] rounded-full bg-gold" />
           <span className="block">
-            <span className="font-serif text-3xl font-semibold tracking-tight text-primary">
-              DLFO
+            <span className="font-serif text-2xl font-semibold leading-tight tracking-tight text-primary">
+              Dynasty League Hub
             </span>
             <span className="mt-1 block text-[11px] font-medium uppercase tracking-[0.16em] text-ink/45">
-              Dynasty League Front Office
+              Est. 2020
             </span>
           </span>
         </Link>

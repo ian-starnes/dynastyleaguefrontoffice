@@ -22,7 +22,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "DLFO — Dynasty League Front Office",
+  title: "The Dynasty League Hub",
   description:
     "The operating system for keeper and dynasty fantasy football.",
 };

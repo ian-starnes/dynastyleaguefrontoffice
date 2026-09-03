@@ -1,4 +1,9 @@
-import { getLeagueSeasonChain, getOwners, getSleeperLeagueId } from "@/lib/sleeper";
+import {
+  getLeagueSeasonChain,
+  getOwners,
+  getSleeperLeagueId,
+  resolveSleeperAvatarUrl,
+} from "@/lib/sleeper";
 import {
   getAllWeeklyPerformances,
   computeLongestStreak,
@@ -24,7 +29,14 @@ export type ManagerProfile = {
   ownerId: string;
   displayName: string;
   teamName: string | null;
-  /** Real, user-uploaded avatar image URL — null if they never set one. Never fabricated. */
+  /**
+   * Real avatar image URL, resolved via resolveSleeperAvatarUrl — null
+   * if they never set one. Never fabricated. NOT simply
+   * owner.metadata?.avatar directly: a bare Sleeper stock-avatar hash
+   * (as opposed to a user-uploaded custom photo, which is already a
+   * full URL) is not a usable <img src> on its own — a confirmed real
+   * bug this field used to have for any manager using a stock avatar.
+   */
   avatarUrl: string | null;
   /**
    * Earliest season THIS FRANCHISE has existed in the league — i.e. when
@@ -221,7 +233,7 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       ownerId,
       displayName: owner.display_name,
       teamName: owner.metadata?.team_name ?? null,
-      avatarUrl: owner.metadata?.avatar ?? null,
+      avatarUrl: resolveSleeperAvatarUrl(owner.metadata?.avatar),
       memberSinceSeason:
         franchiseIdentity.franchiseFoundedSeason.get(ownerId) ??
         Number(fullChain[fullChain.length - 1].season),

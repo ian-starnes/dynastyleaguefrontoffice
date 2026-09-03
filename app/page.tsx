@@ -25,7 +25,9 @@ const PLATFORM_PILLARS = [
 function MarketingHero() {
   return (
     <section className="flex min-h-[70vh] flex-col justify-center">
-      <p className="font-serif text-sm tracking-[0.3em] text-gold">DLFO</p>
+      <p className="font-serif text-sm tracking-[0.3em] text-gold">
+        THE DYNASTY LEAGUE HUB
+      </p>
       <h1 className="mt-4 max-w-2xl font-serif text-5xl leading-[1.05] text-primary sm:text-6xl">
         Run Your Franchise.
       </h1>
