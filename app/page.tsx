@@ -25,10 +25,13 @@ const PLATFORM_PILLARS = [
 function MarketingHero() {
   return (
     <section className="flex min-h-[70vh] flex-col justify-center">
-      <p className="font-serif text-sm tracking-[0.3em] text-gold">
-        THE DYNASTY LEAGUE HUB
-      </p>
-      <h1 className="mt-4 max-w-2xl font-serif text-5xl leading-[1.05] text-primary sm:text-6xl">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/logo-light.png"
+        alt="The Dynasty League"
+        className="h-24 w-24 rounded-full object-cover"
+      />
+      <h1 className="mt-6 max-w-2xl font-serif text-5xl leading-[1.05] text-primary sm:text-6xl">
         Run Your Franchise.
       </h1>
       <p className="mt-6 max-w-xl text-lg italic text-ink/60">

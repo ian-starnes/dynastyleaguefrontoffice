@@ -25,7 +25,12 @@ export function Sidebar() {
           className="flex items-center gap-3"
           onClick={() => setIsMobileMenuOpen(false)}
         >
-          <span aria-hidden className="h-7 w-[3px] rounded-full bg-gold" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-light.png"
+            alt=""
+            className="h-9 w-9 shrink-0 rounded-full object-cover"
+          />
           <span className="font-serif text-xl font-semibold tracking-tight text-primary">
             Dynasty League Hub
           </span>
@@ -51,8 +56,12 @@ export function Sidebar() {
         }`}
       >
         <Link href="/" className="hidden items-center gap-3 lg:flex">
-          {/* Stand-in brand mark until the real league crest is added */}
-          <span aria-hidden className="h-8 w-[3px] rounded-full bg-gold" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/logo-light.png"
+            alt=""
+            className="h-12 w-12 shrink-0 rounded-full object-cover"
+          />
           <span className="block">
             <span className="font-serif text-2xl font-semibold leading-tight tracking-tight text-primary">
               Dynasty League Hub
