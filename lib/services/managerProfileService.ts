@@ -47,6 +47,15 @@ export type ManagerProfile = {
    * history travels with the team."
    */
   memberSinceSeason: number;
+  /**
+   * Earliest season THIS SPECIFIC PERSON (Sleeper account) has held any
+   * roster — distinct from memberSinceSeason above, which follows the
+   * franchise through a manager succession. Use this for anything about
+   * the person (a manager directory); use memberSinceSeason for anything
+   * about the franchise's own history. See franchiseIdentityService.ts's
+   * ownerJoinedSeason doc comment.
+   */
+  personalJoinedSeason: number;
   championships: number;
   runnerUps: number;
   thirdPlaceFinishes: number;
@@ -236,6 +245,9 @@ export async function getManagerProfiles(): Promise<Map<string, ManagerProfile>>
       avatarUrl: resolveSleeperAvatarUrl(owner.metadata?.avatar),
       memberSinceSeason:
         franchiseIdentity.franchiseFoundedSeason.get(ownerId) ??
+        Number(fullChain[fullChain.length - 1].season),
+      personalJoinedSeason:
+        franchiseIdentity.ownerJoinedSeason.get(ownerId) ??
         Number(fullChain[fullChain.length - 1].season),
       championships: ownerPlayoffResults.filter((r) => r.place === 1).length,
       runnerUps: ownerPlayoffResults.filter((r) => r.place === 2).length,

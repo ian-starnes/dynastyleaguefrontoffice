@@ -29,15 +29,15 @@ export default async function ManagersPage() {
                     size={56}
                   />
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-ink">
+                    <p className="truncate text-base font-semibold text-ink">
+                      {manager.contact.realName ?? manager.displayName}
+                    </p>
+                    <p className="truncate text-sm text-ink/60">
                       {manager.teamName ?? manager.displayName}
                     </p>
                     {manager.contact.realName ? (
-                      <p className="truncate text-sm text-ink/70">
-                        {manager.contact.realName}
-                      </p>
+                      <p className="truncate text-xs text-ink/40">@{manager.displayName}</p>
                     ) : null}
-                    <p className="truncate text-xs text-ink/45">{manager.displayName}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs uppercase tracking-wide text-ink/40">
@@ -80,10 +80,12 @@ export default async function ManagersPage() {
                       muted
                     />
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-ink/70">
-                        {manager.teamName ?? manager.name}
+                      <p className="truncate text-base font-semibold text-ink/70">
+                        {manager.name}
                       </p>
-                      <p className="truncate text-sm text-ink/40">{manager.name}</p>
+                      {manager.teamName ? (
+                        <p className="truncate text-sm text-ink/40">{manager.teamName}</p>
+                      ) : null}
                     </div>
                   </div>
                   {manager.yearsActive ? (

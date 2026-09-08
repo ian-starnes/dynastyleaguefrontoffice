@@ -33,6 +33,20 @@ export type FranchiseIdentity = {
   currentOwnerName: Map<string, string | null>;
   /** Earliest season the franchise now held by this current owner_id has existed in the league, regardless of who managed it that season. */
   franchiseFoundedSeason: Map<string, number>;
+  /**
+   * Earliest season THIS SPECIFIC owner_id (a real Sleeper account, i.e.
+   * a real person) held ANY roster — distinct from franchiseFoundedSeason,
+   * which follows the roster/franchise through a manager succession. A
+   * manager who took over an existing franchise personally joined the
+   * league whenever THEY first showed up, not whenever the roster they
+   * now run was founded — e.g. projectpattycakes personally joined in
+   * 2026, even though the franchise they now run (roster_id 4) has
+   * existed since 2020. Use this for anything about the PERSON (a
+   * manager directory, "who's new this year"); use
+   * franchiseFoundedSeason for anything about the TEAM (career stats,
+   * keeper clocks, championships).
+   */
+  ownerJoinedSeason: Map<string, number>;
 };
 
 /**
@@ -63,6 +77,7 @@ export async function getFranchiseIdentityMap(): Promise<FranchiseIdentity> {
 
   const canonicalOwnerId = new Map<string, string>();
   const franchiseFoundedSeason = new Map<string, number>();
+  const ownerJoinedSeason = new Map<string, number>();
 
   fullChain.forEach((league, index) => {
     const season = Number(league.season);
@@ -72,6 +87,11 @@ export async function getFranchiseIdentityMap(): Promise<FranchiseIdentity> {
 
       if (roster.owner_id) {
         canonicalOwnerId.set(roster.owner_id, currentOwnerOfThisRoster);
+
+        const existingJoined = ownerJoinedSeason.get(roster.owner_id);
+        if (existingJoined === undefined || season < existingJoined) {
+          ownerJoinedSeason.set(roster.owner_id, season);
+        }
       }
 
       const existing = franchiseFoundedSeason.get(currentOwnerOfThisRoster);
@@ -81,7 +101,7 @@ export async function getFranchiseIdentityMap(): Promise<FranchiseIdentity> {
     }
   });
 
-  return { canonicalOwnerId, currentOwnerName, franchiseFoundedSeason };
+  return { canonicalOwnerId, currentOwnerName, franchiseFoundedSeason, ownerJoinedSeason };
 }
 
 /**

@@ -3,6 +3,15 @@ export type ManagerContactInfo = {
   realName?: string;
   /** Rough real location (city/region), not a full address — as specific as the manager chose to share. */
   location?: string;
+  /**
+   * A real photo of this manager, e.g. "/managers/dreichert23.jpg" (a
+   * file under public/managers/). Takes priority over their Sleeper
+   * avatar (a profile picture they set in the Sleeper app, not
+   * necessarily a real photo of them) wherever this is set — see
+   * managerDirectoryService.ts. Leave unset to keep showing their
+   * Sleeper avatar until a real photo is provided.
+   */
+  photoUrl?: string;
   email?: string;
   phone?: string;
   discord?: string;
