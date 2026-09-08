@@ -1,3 +1,4 @@
+import { MapPin } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { ManagerAvatar } from "@/components/managers/ManagerAvatar";
@@ -31,12 +32,23 @@ export default async function ManagersPage() {
                     <p className="truncate font-medium text-ink">
                       {manager.teamName ?? manager.displayName}
                     </p>
-                    <p className="truncate text-sm text-ink/50">{manager.displayName}</p>
+                    {manager.contact.realName ? (
+                      <p className="truncate text-sm text-ink/70">
+                        {manager.contact.realName}
+                      </p>
+                    ) : null}
+                    <p className="truncate text-xs text-ink/45">{manager.displayName}</p>
                   </div>
                 </div>
-                <p className="mt-3 text-xs uppercase tracking-wide text-ink/40">
-                  Member since {manager.memberSinceSeason}
-                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs uppercase tracking-wide text-ink/40">
+                  <span>Member since {manager.memberSinceSeason}</span>
+                  {manager.contact.location ? (
+                    <span className="flex items-center gap-1 normal-case tracking-normal">
+                      <MapPin className="h-3 w-3" strokeWidth={1.75} aria-hidden />
+                      {manager.contact.location}
+                    </span>
+                  ) : null}
+                </div>
                 {hasContact ? (
                   <ul className="mt-3 space-y-1 text-sm text-ink/70">
                     {manager.contact.email ? <li>{manager.contact.email}</li> : null}
