@@ -33,14 +33,14 @@ export type ManagerContactInfo = {
  * showing that line, never fabricating one.
  */
 export const MANAGER_CONTACTS: Record<string, ManagerContactInfo> = {
-  "601559414054379520": { realName: "Dan Reichert", location: "Phoenix, AZ" }, // dreichert23 — Project Pete
+  "601559414054379520": { realName: "Dan Reichert", location: "Phoenix, AZ", photoUrl: "/managers/dreichert23.png" }, // dreichert23 — Project Pete
   "604054897641459712": { realName: "Chris Ramirez", location: "Southern CA" }, // KingRambo23 — God Squad
   "605921765595635712": { realName: "Stew Allen", location: "NW Arkansas" }, // stewstewcachoo — Stew Crew
   "606540719221465088": { realName: "Andrew Wittmers", location: "Kansas City, MO" }, // AWittmers — The Assault "Bombs Away"
   "606606739135074304": { realName: "Jon Hediger", location: "NW Arkansas" }, // Hediger — QB Whisperer
   "678666053185773568": { realName: "Ryan \"Dick\" Hardwick", location: "Kansas City, MO" }, // Dick21 — The Great Googly Moogly
   "73278036199751680": { realName: "Mike \"Dixon\" Wood", location: "NYC Metro" }, // IAmDixonWood — The Buffalo Kills
-  "465583007055474688": { realName: "Ian Starnes", location: "NW Arkansas" }, // Starnz — Young Guns ★
+  "465583007055474688": { realName: "Ian Starnes", location: "NW Arkansas", photoUrl: "/managers/Starnz.png" }, // Starnz — Young Guns ★
   "598973295123021824": { realName: "Daniel Gibson", location: "Scottsdale, AZ" }, // danielgibson — Harambe's Make-A-Wish
   "1397244357983092736": { realName: "Pat Dolan & Tabor Dugger", location: "NW Arkansas" }, // projectpattycakes (2 co-owners)
 };
