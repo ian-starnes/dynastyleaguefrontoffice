@@ -15,6 +15,8 @@ export type RecentMovement = {
 export type FrontOfficeSummary = {
   ownerId: string;
   ownerName: string | null;
+  /** The real current season this whole summary — Market Value above all — is computed for, e.g. 2026. Never hardcoded; always this season's real value, so it never goes stale. */
+  currentSeason: number;
   franchiseValue: number;
   franchiseValueRank: number;
   totalFranchises: number;
@@ -138,6 +140,7 @@ export async function getFrontOfficeSummary(
   return {
     ownerId,
     ownerName: myValuation.ownerName,
+    currentSeason,
     franchiseValue: myValuation.franchiseValue,
     franchiseValueRank: myValuation.rank,
     totalFranchises: valuations.length,

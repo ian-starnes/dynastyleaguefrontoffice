@@ -1,15 +1,25 @@
 import type { Column } from "@/components/ui/DataTable";
 import { Tooltip } from "@/components/ui/Tooltip";
 import type { LeaguePlayer } from "@/lib/league-players";
+import type { MarketValueChange } from "@/lib/services/marketValueSnapshotService";
 import { PlayerHeadshot } from "./PlayerHeadshot";
+import { MarketValueChangeBadge } from "./MarketValueChangeBadge";
 import { formatDollarValue } from "@/lib/format";
 
 type AssetColumnsOptions = {
   onOwnerClick: (ownerId: string) => void;
   onPlayerClick: (player: LeaguePlayer) => void;
+  currentSeason: number;
+  marketValueChanges: Record<string, MarketValueChange>;
 };
 
-function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
+function AssetValueBreakdown({
+  player,
+  currentSeason,
+}: {
+  player: LeaguePlayer;
+  currentSeason: number;
+}) {
   if (player.marketValue === null || player.keeperSurplus === null) {
     return <span>Not enough data to break this down.</span>;
   }
@@ -21,7 +31,9 @@ function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
       <p className="font-semibold uppercase tracking-wide text-gold">
         Asset Value
       </p>
-      <p>{formatDollarValue(player.marketValue)} Market Value</p>
+      <p>
+        {formatDollarValue(player.marketValue)} {currentSeason} Market Value
+      </p>
       <p>
         {surplusSign}
         {formatDollarValue(player.keeperSurplus)} Keeper Surplus
@@ -44,6 +56,8 @@ function AssetValueBreakdown({ player }: { player: LeaguePlayer }) {
 export function createAssetColumns({
   onOwnerClick,
   onPlayerClick,
+  currentSeason,
+  marketValueChanges,
 }: AssetColumnsOptions): Column<LeaguePlayer>[] {
   return [
     {
@@ -101,7 +115,7 @@ export function createAssetColumns({
     },
     {
       id: "marketValue",
-      header: "Market Value",
+      header: `${currentSeason} Market Value`,
       sortable: true,
       // "How good is the player?" — a restrained blue, distinct from the
       // contract (green/red) and franchise (gold) figures next to it.
@@ -115,6 +129,18 @@ export function createAssetColumns({
         ) : (
           <span className="text-ink/30">—</span>
         ),
+    },
+    {
+      id: "marketValueChange",
+      header: "Change",
+      sortable: true,
+      // A stock-ticker-style change indicator versus the most recent
+      // real recorded snapshot — see marketValueSnapshotService.ts. No
+      // entry (not zero) for a player with no snapshot history yet.
+      sortValue: (row) => marketValueChanges[row.nflPlayer.id]?.change ?? Number.NEGATIVE_INFINITY,
+      render: (row) => (
+        <MarketValueChangeBadge change={marketValueChanges[row.nflPlayer.id] ?? null} />
+      ),
     },
     {
       id: "keeperCost",
@@ -158,7 +184,9 @@ export function createAssetColumns({
       sortValue: (row) => row.assetValue ?? Number.NEGATIVE_INFINITY,
       render: (row) =>
         row.assetValue !== null ? (
-          <Tooltip content={<AssetValueBreakdown player={row} />}>
+          <Tooltip
+            content={<AssetValueBreakdown player={row} currentSeason={currentSeason} />}
+          >
             <span className="cursor-default text-base font-semibold text-gold">
               {formatDollarValue(row.assetValue)}
             </span>

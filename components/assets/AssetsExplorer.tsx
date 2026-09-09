@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/DataTable";
 import { getMyOwnerId } from "@/lib/sleeper";
 import type { LeaguePlayer } from "@/lib/league-players";
+import type { MarketValueChange } from "@/lib/services/marketValueSnapshotService";
 import { createAssetColumns } from "./assetColumns";
 import {
   ASSET_FILTERS,
@@ -47,7 +48,16 @@ function getPlayerRowKey(row: LeaguePlayer): string {
  * over already-fetched data client-side, no need to hit Sleeper again per
  * keystroke or click.
  */
-export function AssetsExplorer({ players }: { players: LeaguePlayer[] }) {
+export function AssetsExplorer({
+  players,
+  currentSeason,
+  marketValueChanges,
+}: {
+  players: LeaguePlayer[];
+  currentSeason: number;
+  /** Plain object, not a Map — the safe shape for a Server Component to hand a Client Component. Keyed by player_id. */
+  marketValueChanges: Record<string, MarketValueChange>;
+}) {
   const [tableState, setTableState] = useTableState<AssetsTableState>(
     "assets",
     DEFAULT_STATE
@@ -97,8 +107,10 @@ export function AssetsExplorer({ players }: { players: LeaguePlayer[] }) {
       createAssetColumns({
         onOwnerClick: handleOwnerClick,
         onPlayerClick: handlePlayerClick,
+        currentSeason,
+        marketValueChanges,
       }),
-    [handleOwnerClick, handlePlayerClick]
+    [handleOwnerClick, handlePlayerClick, currentSeason, marketValueChanges]
   );
 
   const filteredPlayers = useMemo(() => {
@@ -165,7 +177,11 @@ export function AssetsExplorer({ players }: { players: LeaguePlayer[] }) {
         />
       </Card>
 
-      <PlayerDetailDrawer player={selectedPlayer} onClose={handleDrawerClose} />
+      <PlayerDetailDrawer
+        player={selectedPlayer}
+        onClose={handleDrawerClose}
+        currentSeason={currentSeason}
+      />
     </div>
   );
 }

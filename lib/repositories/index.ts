@@ -8,4 +8,8 @@ export { TradeRepository } from "./TradeRepository";
 export { WeeklyPerformanceRepository } from "./WeeklyPerformanceRepository";
 export { KeeperDeclarationRepository } from "./KeeperDeclarationRepository";
 export { PlayoffResultRepository } from "./PlayoffResultRepository";
+export {
+  MarketValueSnapshotRepository,
+  type MarketValueSnapshot,
+} from "./MarketValueSnapshotRepository";
 export { getLedger, type LedgerEntry } from "./Ledger";

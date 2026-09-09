@@ -46,7 +46,7 @@ export default async function TeamDetailPage({
           valueClassName="text-gold"
         />
         <StatTile
-          label="Roster Market Value"
+          label={`${summary.currentSeason} Roster Market Value`}
           value={formatDollarValue(summary.rosterMarketValue)}
         />
         <StatTile
@@ -130,7 +130,8 @@ export default async function TeamDetailPage({
       <p className="mt-2 text-xs text-ink/40">
         <span className="sm:hidden">Keeper Surplus · Asset Value</span>
         <span className="hidden sm:inline">
-          Market Value · Keeper Cost · Keeper Surplus · Years Remaining · Asset Value
+          {summary.currentSeason} Market Value · Keeper Cost · Keeper Surplus · Years Remaining ·
+          Asset Value
         </span>
       </p>
 

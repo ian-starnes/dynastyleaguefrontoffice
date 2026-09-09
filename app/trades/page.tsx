@@ -1,13 +1,13 @@
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
-import { TradeBuilder } from "@/components/trades/TradeBuilder";
+import { TradeAnalyzer } from "@/components/trades/TradeAnalyzer";
 import { getLeaguePlayers } from "@/lib/league-players";
 import { getRosters, getOwners } from "@/lib/sleeper";
 import { getFuturePicks } from "@/lib/services/futurePicksService";
 
-// Server Component: fetches everything the Trade Center needs (rosters,
+// Server Component: fetches everything the Trade Analyzer needs (rosters,
 // owners, players, future picks) and hands it to the client-side
-// TradeBuilder for the interactive proposal-building UI. Evaluation
+// TradeAnalyzer for the interactive proposal-building UI. Evaluation
 // itself runs server-side via app/trades/actions.ts's Server Action,
 // through lib/services/tradeCalculatorService.ts — never in the browser.
 export default async function TradesPage() {
@@ -64,11 +64,11 @@ export default async function TradesPage() {
     return (
       <div>
         <PageHeader
-          title="Trades"
-          description="Propose a trade and see its real multi-year impact on both franchises."
+          title="Trade Analyzer"
+          description="Propose a trade and pressure-test it — real impact to each side's current Market Value and Franchise Value, plus the longer-horizon multi-year keeper value."
         />
         <div className="mt-8">
-          <TradeBuilder
+          <TradeAnalyzer
             owners={ownerOptions}
             rostersByOwnerId={rostersByOwnerId}
             picksByOwnerId={picksByOwnerId}
@@ -80,8 +80,8 @@ export default async function TradesPage() {
     return (
       <div>
         <PageHeader
-          title="Trades"
-          description="Propose a trade and see its real multi-year impact on both franchises."
+          title="Trade Analyzer"
+          description="Propose a trade and pressure-test it — real impact to each side's current Market Value and Franchise Value, plus the longer-horizon multi-year keeper value."
         />
         <Card className="mt-8 p-8">
           <p className="text-sm text-ink/60">

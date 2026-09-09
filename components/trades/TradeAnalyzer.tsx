@@ -21,6 +21,14 @@ function assetKey(asset: TradeAsset): string {
   return asset.kind === "player" ? `player:${asset.playerId}` : `pick:${asset.season}:${asset.round}`;
 }
 
+function formatChange(value: number): string {
+  return `${value >= 0 ? "+" : ""}${formatDollarValue(value)}`;
+}
+
+function changeClassName(value: number): string {
+  return value >= 0 ? "text-primary" : "text-red-700";
+}
+
 function TeamAssetPicker({
   label,
   owners,
@@ -106,60 +114,143 @@ function TeamAssetPicker({
   );
 }
 
+function AssetImpactLine({
+  asset,
+  direction,
+}: {
+  asset: TradeEvaluation["sideA"]["assetsGivenUp"][number];
+  direction: "given" | "received";
+}) {
+  const yearsNote =
+    direction === "given"
+      ? asset.currentOwnerYearsRemaining !== null
+        ? ` (${asset.currentOwnerYearsRemaining}y left)`
+        : ""
+      : asset.acquiringOwnerYearsRemaining !== null
+        ? ` (resets to ${asset.acquiringOwnerYearsRemaining}y)`
+        : "";
+
+  const surplus =
+    direction === "given" ? asset.currentOwnerProjectedSurplus : asset.acquiringOwnerProjectedSurplus;
+
+  return (
+    <div className="mt-1 flex justify-between text-sm">
+      <span>
+        {asset.label}
+        {yearsNote}
+      </span>
+      {asset.currentMarketValue === null ? (
+        <span className="text-ink/30">no market value yet</span>
+      ) : (
+        <span className={direction === "given" ? "text-ink/60" : "text-primary"}>
+          {direction === "received" && surplus >= 0 ? "+" : ""}
+          {formatDollarValue(surplus)} {direction === "given" ? "forfeited" : "gained"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function FranchiseImpactRow({
+  label,
+  before,
+  after,
+  change,
+  emphasize,
+}: {
+  label: string;
+  before: number;
+  after: number;
+  change: number;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-sm">
+      <span className={emphasize ? "font-medium text-ink" : "text-ink/60"}>{label}</span>
+      <span className="flex items-center gap-2">
+        <span className={emphasize ? "text-ink" : "text-ink/50"}>
+          {formatDollarValue(before)} → {formatDollarValue(after)}
+        </span>
+        <span className={`font-medium ${changeClassName(change)}`}>{formatChange(change)}</span>
+      </span>
+    </div>
+  );
+}
+
 function TradeResultCard({
   title,
   evaluation,
+  currentSeason,
 }: {
   title: string;
   evaluation: TradeEvaluation["sideA"];
+  currentSeason: number;
 }) {
+  const { franchiseImpact } = evaluation;
+
   return (
     <Card className="p-5">
       <h3 className="font-serif text-lg text-primary">{title}</h3>
 
       <div className="mt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">Gives Up</p>
-        {evaluation.assetsGivenUp.map((a) => (
-          <div key={a.label} className="mt-1 flex justify-between text-sm">
-            <span>
-              {a.label}
-              {a.currentOwnerYearsRemaining !== null
-                ? ` (${a.currentOwnerYearsRemaining}y left)`
-                : ""}
-            </span>
-            <span className="text-ink/60">
-              {formatDollarValue(a.currentOwnerProjectedSurplus)} forfeited
-            </span>
-          </div>
-        ))}
+        {evaluation.assetsGivenUp.length === 0 ? (
+          <p className="mt-1 text-sm text-ink/40">Nothing</p>
+        ) : (
+          evaluation.assetsGivenUp.map((a) => (
+            <AssetImpactLine key={a.label} asset={a} direction="given" />
+          ))
+        )}
       </div>
 
       <div className="mt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">Receives</p>
-        {evaluation.assetsReceived.map((a) => (
-          <div key={a.label} className="mt-1 flex justify-between text-sm">
-            <span>
-              {a.label}
-              {a.acquiringOwnerYearsRemaining !== null
-                ? ` (resets to ${a.acquiringOwnerYearsRemaining}y)`
-                : ""}
-            </span>
-            <span className="text-primary">
-              +{formatDollarValue(a.acquiringOwnerProjectedSurplus)} gained
-            </span>
-          </div>
-        ))}
+        {evaluation.assetsReceived.length === 0 ? (
+          <p className="mt-1 text-sm text-ink/40">Nothing</p>
+        ) : (
+          evaluation.assetsReceived.map((a) => (
+            <AssetImpactLine key={a.label} asset={a} direction="received" />
+          ))
+        )}
       </div>
 
       <div className="mt-4 border-t border-black/10 pt-4">
         <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-          Net Multi-Year Impact
+          {currentSeason} Market Value &amp; Franchise Value Impact
         </p>
-        <p
-          className={`mt-1 font-serif text-2xl ${evaluation.netChange >= 0 ? "text-primary" : "text-red-700"}`}
-        >
-          {evaluation.netChange >= 0 ? "+" : ""}
-          {formatDollarValue(evaluation.netChange)}
+        <div className="mt-2 space-y-1.5">
+          <FranchiseImpactRow
+            label={`${currentSeason} Roster Market Value`}
+            before={franchiseImpact.before.rosterMarketValue}
+            after={franchiseImpact.after.rosterMarketValue}
+            change={franchiseImpact.change.rosterMarketValue}
+          />
+          <FranchiseImpactRow
+            label="Future Pick Value"
+            before={franchiseImpact.before.futurePickValue}
+            after={franchiseImpact.after.futurePickValue}
+            change={franchiseImpact.change.futurePickValue}
+          />
+          <FranchiseImpactRow
+            label="Total Franchise Value"
+            before={franchiseImpact.before.franchiseValue}
+            after={franchiseImpact.after.franchiseValue}
+            change={franchiseImpact.change.franchiseValue}
+            emphasize
+          />
+        </div>
+      </div>
+
+      <div className="mt-4 border-t border-black/10 pt-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
+          Net Multi-Year Keeper Value
+        </p>
+        <p className={`mt-1 font-serif text-2xl ${changeClassName(evaluation.netChange)}`}>
+          {formatChange(evaluation.netChange)}
+        </p>
+        <p className="mt-1 text-xs text-ink/40">
+          Projected cumulative keeper surplus over the years remaining on each asset — a
+          longer-horizon view, distinct from the immediate impact above.
         </p>
       </div>
     </Card>
@@ -167,13 +258,16 @@ function TradeResultCard({
 }
 
 /**
- * DLFO's Trade Center — evaluates a proposed (not executed) trade via
- * lib/services/tradeCalculatorService.ts's multi-year projection, which
- * is where the real "receiving-team contract reset" value shows up (a
+ * DLFO's Trade Analyzer — pressure-tests a proposed (not executed) trade
+ * two ways: the immediate real impact to each side's actual Market Value
+ * and Franchise Value (franchiseImpact, using the exact same methodology
+ * as the League/Front Office pages), and the longer-horizon multi-year
+ * keeper-surplus projection via lib/services/tradeCalculatorService.ts
+ * (where the real "receiving-team contract reset" value shows up — a
  * same-day Asset Value comparison would always show zero difference,
  * per that service's own doc comment).
  */
-export function TradeBuilder({
+export function TradeAnalyzer({
   owners,
   rostersByOwnerId,
   picksByOwnerId,
@@ -261,14 +355,22 @@ export function TradeBuilder({
 
       <div className="mt-6 flex justify-center">
         <Button onClick={handleEvaluate} disabled={!canEvaluate || isEvaluating}>
-          {isEvaluating ? "Evaluating…" : "Evaluate Trade"}
+          {isEvaluating ? "Analyzing…" : "Analyze Trade"}
         </Button>
       </div>
 
       {evaluation ? (
         <div className="mt-8 grid gap-6 md:grid-cols-2">
-          <TradeResultCard title={evaluation.sideA.ownerName ?? "Team A"} evaluation={evaluation.sideA} />
-          <TradeResultCard title={evaluation.sideB.ownerName ?? "Team B"} evaluation={evaluation.sideB} />
+          <TradeResultCard
+            title={evaluation.sideA.ownerName ?? "Team A"}
+            evaluation={evaluation.sideA}
+            currentSeason={evaluation.currentSeason}
+          />
+          <TradeResultCard
+            title={evaluation.sideB.ownerName ?? "Team B"}
+            evaluation={evaluation.sideB}
+            currentSeason={evaluation.currentSeason}
+          />
         </div>
       ) : null}
     </div>

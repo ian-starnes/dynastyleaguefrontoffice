@@ -126,7 +126,7 @@ export default async function HomePage() {
           sublabel={summary.currentSeasonRank === null ? "Season hasn't started" : undefined}
         />
         <StatTile
-          label="Roster Market Value"
+          label={`${summary.currentSeason} Roster Market Value`}
           value={formatDollarValue(summary.rosterMarketValue)}
         />
         <StatTile

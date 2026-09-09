@@ -9,6 +9,7 @@ import { formatDollarValue } from "@/lib/format";
 type PlayerDetailDrawerProps = {
   player: LeaguePlayer | null;
   onClose: () => void;
+  currentSeason: number;
 };
 
 /**
@@ -20,6 +21,7 @@ type PlayerDetailDrawerProps = {
 export function PlayerDetailDrawer({
   player,
   onClose,
+  currentSeason,
 }: PlayerDetailDrawerProps) {
   useEffect(() => {
     if (!player) return;
@@ -81,7 +83,7 @@ export function PlayerDetailDrawer({
         <dl className="mt-8 space-y-5">
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-ink/50">
-              Market Value
+              {currentSeason} Market Value
             </dt>
             <dd
               className={`mt-1 text-xl ${

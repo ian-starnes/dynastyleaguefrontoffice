@@ -139,6 +139,26 @@ create table if not exists playoff_results (
   unique (league_id, season, roster_id)
 );
 
+-- Daily snapshot of each player's real, live Market Value — the one
+-- piece of history nothing else in this schema captures, since every
+-- other table stores FACTS (contracts, transactions) while Market Value
+-- itself is always computed live at read time, never stored, everywhere
+-- else in this codebase (lib/services/rosValuationService.ts). Powers
+-- the Assets page's Market Value change ticker. One row per
+-- (league, player, day), written on-demand the first time anyone loads
+-- the Assets page that real calendar day — not on a fixed cron schedule
+-- — so a day nobody visits the site just has no snapshot, rather than a
+-- fabricated one. See lib/services/marketValueSnapshotService.ts.
+create table if not exists market_value_snapshots (
+  id             bigserial primary key,
+  league_id      text not null references leagues(league_id),
+  player_id      text not null,
+  season         int not null,
+  snapshot_date  date not null default current_date,
+  market_value   int not null,
+  unique (league_id, player_id, snapshot_date)
+);
+
 create index if not exists idx_transactions_league on transactions (league_id);
 create index if not exists idx_auction_records_player on auction_records (league_id, player_id);
 create index if not exists idx_trades_league on trades (league_id);
@@ -146,3 +166,5 @@ create index if not exists idx_weekly_performances_league_season on weekly_perfo
 create index if not exists idx_weekly_performances_roster on weekly_performances (league_id, roster_id);
 create index if not exists idx_keeper_declarations_league_season on keeper_declarations (league_id, season);
 create index if not exists idx_playoff_results_league_season on playoff_results (league_id, season);
+create index if not exists idx_market_value_snapshots_lookup
+  on market_value_snapshots (league_id, player_id, snapshot_date);

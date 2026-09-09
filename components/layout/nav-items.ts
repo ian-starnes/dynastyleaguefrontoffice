@@ -24,7 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Teams", href: "/teams", icon: Users },
   { label: "Managers", href: "/managers", icon: BookUser },
   { label: "Assets", href: "/assets", icon: Wallet },
-  { label: "Trades", href: "/trades", icon: ArrowLeftRight },
+  { label: "Trade Analyzer", href: "/trades", icon: ArrowLeftRight },
   { label: "History", href: "/history", icon: ScrollText },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

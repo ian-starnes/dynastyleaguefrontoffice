@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatTile } from "@/components/ui/StatTile";
 import { FranchiseRankingsTable } from "@/components/league/FranchiseRankingsTable";
 import { FranchiseValueService } from "@/lib/services/franchiseValueService";
+import { getLeague } from "@/lib/sleeper";
 import { formatDollarValue } from "@/lib/format";
 
 // Server Component: all data access goes through FranchiseValueService,
@@ -11,7 +12,11 @@ import { formatDollarValue } from "@/lib/format";
 export default async function LeaguePage() {
   try {
     const service = new FranchiseValueService();
-    const summary = await service.getLeagueEconomicsSummary();
+    const [summary, league] = await Promise.all([
+      service.getLeagueEconomicsSummary(),
+      getLeague(),
+    ]);
+    const currentSeason = Number(league.season);
 
     const largestSurplusPlayer = summary.largestKeeperSurplus?.player ?? null;
     const largestContractPlayer = summary.largestContract?.player ?? null;
@@ -68,7 +73,7 @@ export default async function LeaguePage() {
           Franchise Rankings
         </h2>
         <Card className="mt-4">
-          <FranchiseRankingsTable franchises={summary.franchises} />
+          <FranchiseRankingsTable franchises={summary.franchises} currentSeason={currentSeason} />
         </Card>
       </div>
     );

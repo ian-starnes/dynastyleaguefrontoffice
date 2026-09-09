@@ -1,4 +1,5 @@
 import {
+  getLeague,
   getRosters,
   getOwners,
   getAllTransactions,
@@ -24,6 +25,8 @@ export type PlayerDraftPick = {
 
 export type PlayerProfile = {
   player: LeaguePlayer;
+  /** The real current season this player's Market Value is computed for, e.g. 2026 — never hardcoded. */
+  currentSeason: number;
   /** Most recent first. */
   transactions: PlayerTransactionEvent[];
   draftPick: PlayerDraftPick | null;
@@ -42,7 +45,8 @@ export async function getPlayerProfile(
   const player = await getLeaguePlayer(playerId);
   if (!player) return null;
 
-  const [allTransactions, rosters, owners, drafts] = await Promise.all([
+  const [league, allTransactions, rosters, owners, drafts] = await Promise.all([
+    getLeague(),
     getAllTransactions().catch((error: unknown) => {
       console.error(
         "Sleeper transactions fetch failed, showing no history:",
@@ -127,5 +131,5 @@ export async function getPlayerProfile(
     }
   }
 
-  return { player, transactions, draftPick };
+  return { player, currentSeason: Number(league.season), transactions, draftPick };
 }

@@ -10,8 +10,8 @@ import { formatDollarValue } from "@/lib/format";
 // Listed as labels only; never a fabricated number. (Market Value, Keeper
 // Cost, Keeper Surplus, Years Remaining, and Asset Value all moved out of
 // this list once they became real — even placeholder-backed — fields, all
-// in auction dollars.)
-const COMING_SOON_FEATURES = ["Auction Value", "PFF Grade", "Trade Analyzer"];
+// in auction dollars; Trade Analyzer moved out once /trades became one.)
+const COMING_SOON_FEATURES = ["Auction Value", "PFF Grade"];
 
 function BackLink() {
   return (
@@ -60,7 +60,7 @@ export default async function PlayerProfilePage({
     notFound();
   }
 
-  const { player, transactions, draftPick } = profile;
+  const { player, currentSeason, transactions, draftPick } = profile;
 
   return (
     <div>
@@ -94,7 +94,9 @@ export default async function PlayerProfilePage({
           <Tooltip
             content={
               <div className="space-y-1">
-                <p>{formatDollarValue(player.marketValue!)} Market Value</p>
+                <p>
+                  {formatDollarValue(player.marketValue!)} {currentSeason} Market Value
+                </p>
                 <p>
                   {player.keeperSurplus >= 0 ? "+" : ""}
                   {formatDollarValue(player.keeperSurplus)} Keeper Surplus
@@ -120,7 +122,7 @@ export default async function PlayerProfilePage({
       <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card className="p-6">
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-            Market Value
+            {currentSeason} Market Value
           </p>
           <p
             className={`mt-2 font-serif text-3xl ${
