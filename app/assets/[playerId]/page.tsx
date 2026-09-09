@@ -137,7 +137,7 @@ export default async function PlayerProfilePage({
 
         <Card className="p-6">
           <p className="text-xs font-medium uppercase tracking-wide text-ink/50">
-            Keeper Cost
+            {currentSeason + 1} Keeper Cost
           </p>
           <p className="mt-2 font-serif text-3xl text-ink">
             {formatDollarValue(player.keeperCost)}

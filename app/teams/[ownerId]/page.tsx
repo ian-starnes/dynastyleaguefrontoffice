@@ -130,8 +130,8 @@ export default async function TeamDetailPage({
       <p className="mt-2 text-xs text-ink/40">
         <span className="sm:hidden">Keeper Surplus · Asset Value</span>
         <span className="hidden sm:inline">
-          {summary.currentSeason} Market Value · Keeper Cost · Keeper Surplus · Years Remaining ·
-          Asset Value
+          {summary.currentSeason} Market Value · {summary.currentSeason + 1} Keeper Cost · Keeper
+          Surplus · Years Remaining · Asset Value
         </span>
       </p>
 

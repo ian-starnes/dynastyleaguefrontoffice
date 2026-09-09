@@ -144,7 +144,7 @@ export function createAssetColumns({
     },
     {
       id: "keeperCost",
-      header: "Keeper Cost",
+      header: `${currentSeason + 1} Keeper Cost`,
       sortable: true,
       sortValue: (row) => row.keeperCost,
       render: (row) => formatDollarValue(row.keeperCost),

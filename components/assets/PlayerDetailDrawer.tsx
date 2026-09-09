@@ -98,7 +98,7 @@ export function PlayerDetailDrawer({
 
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-ink/50">
-              Keeper Cost
+              {currentSeason + 1} Keeper Cost
             </dt>
             <dd className="mt-1 text-xl text-ink">
               {formatDollarValue(player.keeperCost)}

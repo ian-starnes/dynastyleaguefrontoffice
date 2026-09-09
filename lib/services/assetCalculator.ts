@@ -61,11 +61,18 @@ export function calculateAssetEconomics({
   originalAuctionPrice,
   yearsSincePriceSet,
 }: AssetCalculatorInput): AssetEconomics {
-  // Keeper Cost is determined exclusively by league history —
-  // originalAuctionPrice plus $5 for every offseason since that price was
-  // set. Never derived from marketValue.
+  // Keeper Cost is the price to keep this player through the NEXT
+  // upcoming season, not the season currently underway — the season
+  // already in progress is a locked-in, sunk fact (its own auction
+  // already happened), not a real keeper decision anyone still has in
+  // front of them. So this is originalAuctionPrice plus $5 for every
+  // offseason since that price was set, PLUS one more $5 step for the
+  // next offseason still to come. Always "next season," never a
+  // hardcoded year — this naturally becomes 2028's cost once 2027's own
+  // auction has happened, with no code change needed. Never derived
+  // from marketValue.
   const keeperCost =
-    originalAuctionPrice + KEEPER_INFLATION_PER_YEAR * yearsSincePriceSet;
+    originalAuctionPrice + KEEPER_INFLATION_PER_YEAR * (yearsSincePriceSet + 1);
 
   const keeperSurplus = marketValue !== null ? marketValue - keeperCost : null;
   const assetValue =
@@ -100,10 +107,15 @@ export type MultiYearProjection = {
  * once projected keeperCost would meet or exceed marketValue (a
  * rational GM releases the player rather than keep at a loss), which is
  * why yearsCapturable can come back lower than yearsToProject.
+ *
+ * nextSeasonKeeperCost is player.keeperCost — already the cost for the
+ * FIRST upcoming keeper year (see calculateAssetEconomics), so
+ * yearOffset 0 uses it as-is with no extra inflation; only yearOffset 1+
+ * add further $5 steps on top of it.
  */
 export function projectMultiYearSurplus(
   marketValue: number,
-  currentKeeperCost: number,
+  nextSeasonKeeperCost: number,
   yearsToProject: number
 ): MultiYearProjection {
   let cumulativeSurplus = 0;
@@ -111,7 +123,7 @@ export function projectMultiYearSurplus(
 
   for (let yearOffset = 0; yearOffset < yearsToProject; yearOffset++) {
     const projectedKeeperCost =
-      currentKeeperCost + KEEPER_INFLATION_PER_YEAR * yearOffset;
+      nextSeasonKeeperCost + KEEPER_INFLATION_PER_YEAR * yearOffset;
     const projectedSurplus = marketValue - projectedKeeperCost;
     if (projectedSurplus <= 0) break;
     cumulativeSurplus += projectedSurplus;
