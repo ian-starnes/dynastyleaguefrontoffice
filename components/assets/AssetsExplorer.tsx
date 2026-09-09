@@ -8,7 +8,6 @@ import {
   useTableState,
   type SortState,
 } from "@/components/ui/DataTable";
-import { getMyOwnerId } from "@/lib/sleeper";
 import type { LeaguePlayer } from "@/lib/league-players";
 import type { MarketValueChange } from "@/lib/services/marketValueSnapshotService";
 import { createAssetColumns } from "./assetColumns";
@@ -65,7 +64,6 @@ export function AssetsExplorer({
   const [selectedPlayer, setSelectedPlayer] = useState<LeaguePlayer | null>(
     null
   );
-  const myOwnerId = getMyOwnerId();
 
   const setFilterId = useCallback(
     (filterId: AssetFilterId) =>
@@ -117,7 +115,7 @@ export function AssetsExplorer({
     const query = tableState.search.trim().toLowerCase();
 
     return players.filter((player) => {
-      if (!matchesAssetFilter(player, tableState.filterId, myOwnerId)) {
+      if (!matchesAssetFilter(player, tableState.filterId)) {
         return false;
       }
 
@@ -132,16 +130,34 @@ export function AssetsExplorer({
         .filter((field): field is string => Boolean(field))
         .some((field) => field.toLowerCase().includes(query));
     });
-  }, [players, tableState.filterId, tableState.search, myOwnerId]);
+  }, [players, tableState.filterId, tableState.search]);
 
   const activeOwnerId = ownerIdFromFilter(tableState.filterId);
-  const activeOwnerName = useMemo(() => {
-    if (!activeOwnerId) return null;
-    return (
-      players.find((player) => player.currentOwnerId === activeOwnerId)
-        ?.currentOwnerName ?? null
-    );
-  }, [players, activeOwnerId]);
+
+  // Every real current team, derived straight from the already-fetched
+  // players rather than a separate fetch — every rostered player already
+  // carries their owner's id/name, so a distinct set of those is the
+  // real team list, always in sync with who currently owns what.
+  const teamOptions = useMemo(() => {
+    const teamsById = new Map<string, string>();
+    for (const player of players) {
+      if (player.currentOwnerId && player.currentOwnerName) {
+        teamsById.set(player.currentOwnerId, player.currentOwnerName);
+      }
+    }
+    return [...teamsById.entries()]
+      .map(([ownerId, ownerName]) => ({ ownerId, ownerName }))
+      .sort((a, b) => a.ownerName.localeCompare(b.ownerName));
+  }, [players]);
+
+  const handleTeamFilterChange = useCallback(
+    (ownerId: string) =>
+      setTableState((prev) => ({
+        ...prev,
+        filterId: ownerId === "all" ? "all" : ownerFilterId(ownerId),
+      })),
+    [setTableState]
+  );
 
   return (
     <div>
@@ -152,16 +168,22 @@ export function AssetsExplorer({
             activeId={tableState.filterId}
             onChange={setFilterId}
           />
-          {activeOwnerName ? (
-            <button
-              type="button"
-              onClick={() => setFilterId("all")}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-medium text-background"
-            >
-              {activeOwnerName}
-              <span aria-hidden>×</span>
-            </button>
-          ) : null}
+          <select
+            value={activeOwnerId ?? "all"}
+            onChange={(event) => handleTeamFilterChange(event.target.value)}
+            className={`rounded-full border px-3.5 py-1.5 text-xs font-medium focus:border-primary/30 focus:outline-none ${
+              activeOwnerId
+                ? "border-primary bg-primary text-background"
+                : "border-black/10 bg-white text-ink/60 hover:text-ink"
+            }`}
+          >
+            <option value="all">All Teams</option>
+            {teamOptions.map((team) => (
+              <option key={team.ownerId} value={team.ownerId}>
+                {team.ownerName}
+              </option>
+            ))}
+          </select>
         </div>
         <AssetSearchInput value={tableState.search} onChange={setSearch} />
       </div>
