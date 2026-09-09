@@ -3,11 +3,11 @@ import { MarketValueSnapshotRepository } from "@/lib/repositories";
 import type { LeaguePlayer } from "@/lib/league-players";
 
 export type MarketValueChange = {
-  /** Real prior Market Value from the most recent recorded snapshot before today. */
-  priorValue: number;
-  /** The real calendar date (YYYY-MM-DD) that prior value was recorded on. */
-  priorDate: string;
-  /** Today's real value minus priorValue — positive means it went up. */
+  /** Real Market Value from the most recent recorded snapshot at least a week old — the "last week" benchmark. */
+  benchmarkValue: number;
+  /** The real calendar date (YYYY-MM-DD) that benchmark was recorded on — always >= 7 days before today. */
+  benchmarkDate: string;
+  /** Today's real value minus benchmarkValue — positive means it went up since last week. */
   change: number;
 };
 
@@ -49,10 +49,11 @@ export async function ensureTodaysMarketValueSnapshot(
 }
 
 /**
- * Real Market Value change per player since the most recent prior
- * snapshot — a player with no entry here has no snapshot history yet
- * (e.g. the very first day this feature has ever run), which the Assets
- * page shows as "no history yet," never as a fabricated zero change.
+ * Real Market Value change per player versus a real week-ago benchmark
+ * — a player with no entry here has no snapshot at least 7 days old yet
+ * (e.g. this feature hasn't been running for a full week yet), which the
+ * Assets page shows as "no benchmark yet," never a fabricated zero
+ * change or a same-day comparison masquerading as a weekly one.
  */
 export async function getMarketValueChanges(
   players: LeaguePlayer[]
@@ -62,15 +63,15 @@ export async function getMarketValueChanges(
 
   const changes = new Map<string, MarketValueChange>();
   try {
-    const priorSnapshots = await repository.getMostRecentPriorSnapshots(leagueId);
+    const benchmarkSnapshots = await repository.getWeekAgoBenchmarkSnapshots(leagueId);
     for (const player of players) {
       if (player.marketValue === null) continue;
-      const prior = priorSnapshots.get(player.nflPlayer.id);
-      if (!prior) continue;
+      const benchmark = benchmarkSnapshots.get(player.nflPlayer.id);
+      if (!benchmark) continue;
       changes.set(player.nflPlayer.id, {
-        priorValue: prior.marketValue,
-        priorDate: prior.snapshotDate,
-        change: player.marketValue - prior.marketValue,
+        benchmarkValue: benchmark.marketValue,
+        benchmarkDate: benchmark.snapshotDate,
+        change: player.marketValue - benchmark.marketValue,
       });
     }
   } catch (error: unknown) {

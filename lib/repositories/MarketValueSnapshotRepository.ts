@@ -55,20 +55,24 @@ export class MarketValueSnapshotRepository {
   }
 
   /**
-   * The most recent real snapshot strictly BEFORE today for every player
-   * in this league, in one round trip — the basis for "change since
-   * last recorded value" on the Assets page. Deliberately not "exactly
-   * yesterday": if a day was skipped (nobody visited the site), this
-   * still finds the last real value on record rather than showing no
-   * change at all.
+   * The most recent real snapshot at least 7 days old for every player in
+   * this league, in one round trip — the "last week" benchmark the
+   * Assets page ticker compares against. Deliberately week-old, not
+   * "most recent prior day": real Market Value only actually moves once
+   * a real NFL week's games are played (the underlying stats update
+   * weekly, not daily), so a day-to-day comparison would mostly show
+   * near-zero noise. "At least 7 days old" rather than "exactly 7 days
+   * old" so a gap (a day nobody visited the site) doesn't break the
+   * comparison — it just reaches slightly further back for the closest
+   * real data point on or before that boundary.
    */
-  async getMostRecentPriorSnapshots(
+  async getWeekAgoBenchmarkSnapshots(
     leagueId: string
   ): Promise<Map<string, MarketValueSnapshot>> {
     const rows = (await sql`
       select distinct on (player_id) player_id, snapshot_date::text, market_value
       from market_value_snapshots
-      where league_id = ${leagueId} and snapshot_date < current_date
+      where league_id = ${leagueId} and snapshot_date <= current_date - 7
       order by player_id, snapshot_date desc
     `) as { player_id: string; snapshot_date: string; market_value: number }[];
 

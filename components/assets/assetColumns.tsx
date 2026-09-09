@@ -132,11 +132,11 @@ export function createAssetColumns({
     },
     {
       id: "marketValueChange",
-      header: "Change",
+      header: "vs Last Week",
       sortable: true,
-      // A stock-ticker-style change indicator versus the most recent
-      // real recorded snapshot — see marketValueSnapshotService.ts. No
-      // entry (not zero) for a player with no snapshot history yet.
+      // A stock-ticker-style change indicator versus a real snapshot at
+      // least 7 days old — see marketValueSnapshotService.ts. No entry
+      // (not zero) for a player with no week-old benchmark yet.
       sortValue: (row) => marketValueChanges[row.nflPlayer.id]?.change ?? Number.NEGATIVE_INFINITY,
       render: (row) => (
         <MarketValueChangeBadge change={marketValueChanges[row.nflPlayer.id] ?? null} />
