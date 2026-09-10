@@ -159,22 +159,22 @@ export default async function HomePage() {
                 <Link
                   key={player.nflPlayer.id}
                   href={`/assets/${player.nflPlayer.id}`}
-                  className="flex items-center justify-between p-4 hover:bg-black/[0.02]"
+                  className="flex items-center justify-between gap-3 p-4 hover:bg-black/[0.02]"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <PlayerHeadshot
                       playerId={player.nflPlayer.id}
                       name={player.nflPlayer.fullName}
                       size={36}
                     />
-                    <div>
-                      <p className="font-medium text-ink">{player.nflPlayer.fullName}</p>
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink">{player.nflPlayer.fullName}</p>
                       <p className="text-xs text-ink/50">
                         {player.nflPlayer.position} · {player.nflPlayer.nflTeam}
                       </p>
                     </div>
                   </div>
-                  <span className="font-serif text-gold">
+                  <span className="shrink-0 font-serif text-gold">
                     {formatDollarValue(player.assetValue ?? 0)}
                   </span>
                 </Link>
@@ -193,10 +193,10 @@ export default async function HomePage() {
                 <Link
                   key={player.nflPlayer.id}
                   href={`/assets/${player.nflPlayer.id}`}
-                  className="flex items-center justify-between p-4 hover:bg-black/[0.02]"
+                  className="flex items-center justify-between gap-3 p-4 hover:bg-black/[0.02]"
                 >
-                  <span className="text-sm text-ink">{player.nflPlayer.fullName}</span>
-                  <span className="text-xs text-ink/50">
+                  <span className="min-w-0 truncate text-sm text-ink">{player.nflPlayer.fullName}</span>
+                  <span className="shrink-0 text-xs text-ink/50">
                     {player.keeperYearsRemaining} yr{player.keeperYearsRemaining !== 1 ? "s" : ""} left
                   </span>
                 </Link>

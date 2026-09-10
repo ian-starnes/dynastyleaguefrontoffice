@@ -72,21 +72,24 @@ function TeamAssetPicker({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-black/[0.03]"
+              className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-2 text-sm hover:bg-black/[0.03]"
             >
-              <span className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selected.has(key)}
-                  onChange={() => onToggle(asset)}
-                />
-                {player.fullName}
-                <span className="text-xs text-ink/40">
+              <input
+                type="checkbox"
+                checked={selected.has(key)}
+                onChange={() => onToggle(asset)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                  <span className="truncate">{player.fullName}</span>
+                  <span className="shrink-0 text-xs text-ink/50">
+                    {player.marketValue !== null ? formatDollarValue(player.marketValue) : "—"}
+                  </span>
+                </span>
+                <span className="block text-xs text-ink/40">
                   {player.position} · {player.nflTeam}
                 </span>
-              </span>
-              <span className="text-xs text-ink/50">
-                {player.marketValue !== null ? formatDollarValue(player.marketValue) : "—"}
               </span>
             </label>
           );
@@ -98,12 +101,13 @@ function TeamAssetPicker({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-black/[0.03]"
+              className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-black/[0.03]"
             >
               <input
                 type="checkbox"
                 checked={selected.has(key)}
                 onChange={() => onToggle(asset)}
+                className="h-4 w-4 shrink-0 accent-primary"
               />
               {pick.season} Round {pick.round} Pick
             </label>
@@ -165,9 +169,9 @@ function FranchiseImpactRow({
   emphasize?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="flex flex-col gap-0.5 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
       <span className={emphasize ? "font-medium text-ink" : "text-ink/60"}>{label}</span>
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         <span className={emphasize ? "text-ink" : "text-ink/50"}>
           {formatDollarValue(before)} → {formatDollarValue(after)}
         </span>

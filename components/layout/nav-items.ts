@@ -6,6 +6,7 @@ import {
   Wallet,
   ArrowLeftRight,
   ScrollText,
+  Gavel,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -26,5 +27,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Assets", href: "/assets", icon: Wallet },
   { label: "Trade Analyzer", href: "/trades", icon: ArrowLeftRight },
   { label: "History", href: "/history", icon: ScrollText },
+  { label: "Constitution", href: "/constitution", icon: Gavel },
   { label: "Settings", href: "/settings", icon: Settings },
 ];

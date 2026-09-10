@@ -25,7 +25,7 @@ export function ChipGroup<T extends string>({
             type="button"
             onClick={() => onChange(chip.id)}
             aria-pressed={isActive}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
               isActive
                 ? "bg-primary text-background"
                 : "border border-black/10 text-ink/60 hover:bg-black/[0.03] hover:text-ink"

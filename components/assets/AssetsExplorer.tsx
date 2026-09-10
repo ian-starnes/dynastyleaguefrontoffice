@@ -171,7 +171,7 @@ export function AssetsExplorer({
           <select
             value={activeOwnerId ?? "all"}
             onChange={(event) => handleTeamFilterChange(event.target.value)}
-            className={`rounded-full border px-3.5 py-1.5 text-xs font-medium focus:border-primary/30 focus:outline-none ${
+            className={`rounded-full border px-3.5 py-2 text-xs font-medium focus:border-primary/30 focus:outline-none ${
               activeOwnerId
                 ? "border-primary bg-primary text-background"
                 : "border-black/10 bg-white text-ink/60 hover:text-ink"

@@ -56,7 +56,7 @@ export function PlayerDetailDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="self-end text-sm font-medium text-ink/50 hover:text-primary"
+          className="-m-2 self-end p-2 text-sm font-medium text-ink/50 hover:text-primary"
         >
           Close ×
         </button>
