@@ -52,9 +52,9 @@ export function LeagueRecordsGrid({ records }: { records: LeagueRecords }) {
         sublabel={records.mostFinalsAppearances?.ownerName ?? undefined}
       />
       <StatTile
-        label="Most Third-Place Finishes"
-        value={records.mostThirdPlaceFinishes?.count ?? "—"}
-        sublabel={records.mostThirdPlaceFinishes?.ownerName ?? undefined}
+        label="Most Playoff Appearances"
+        value={records.mostPlayoffAppearances?.count ?? "—"}
+        sublabel={records.mostPlayoffAppearances?.ownerName ?? undefined}
       />
       <StatTile
         label="Largest Blowout"

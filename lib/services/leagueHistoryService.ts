@@ -12,191 +12,24 @@ import {
   type AuctionPurchase,
 } from "./transactionHistoryService";
 
-async function getPlayoffWeekStartBySeason(): Promise<Map<number, number>> {
-  const fullChain = await getLeagueSeasonChain(getSleeperLeagueId());
-  const map = new Map<number, number>();
-  for (const league of fullChain) {
-    map.set(Number(league.season), Number(league.settings.playoff_week_start ?? 15));
-  }
-  return map;
-}
-
-export type HeadToHead = {
-  ownerAId: string;
-  ownerAName: string | null;
-  ownerBId: string;
-  ownerBName: string | null;
-  ownerAWins: number;
-  ownerBWins: number;
-  ties: number;
-  regularSeason: { ownerAWins: number; ownerBWins: number; ties: number };
-  playoffs: { ownerAWins: number; ownerBWins: number; ties: number };
-  averageMargin: number; // from owner A's perspective — positive means A tends to win by more
-  biggestWin: { season: number; week: number; margin: number } | null; // A's biggest margin of victory
-  biggestLoss: { season: number; week: number; margin: number } | null; // A's biggest margin of defeat
-  highestCombinedScore: { season: number; week: number; total: number } | null;
-  /** Most recent first. */
-  last10Meetings: { season: number; week: number; ownerAScore: number; ownerBScore: number; winner: "A" | "B" | "tie" }[];
-  currentStreak: { owner: "A" | "B" | "tie"; length: number } | null;
-  ownerACareerPointsFor: number;
-  ownerACareerPointsAgainst: number;
-};
-
 /**
- * Every owner pair that has ever played each other, with the full
- * record the brief's All-Time Head-to-Head section asks for. Built from
- * one owner's perspective per pair (ownerAId < ownerBId alphabetically)
- * — each real meeting already appears twice in getAllWeeklyPerformances
- * (once from each side), so this reads only the ownerA-perspective rows
- * for a pair, never double-counts.
+ * Per-season league settings every downstream computation in this file
+ * needs to tell regular-season weeks/placements apart from playoff ones —
+ * fetched once here rather than separately by each caller.
  */
-export function computeHeadToHead(
-  performances: OwnerWeeklyPerformance[],
-  playoffWeekStartBySeason: Map<number, number>
-): HeadToHead[] {
-  const meetingsByPairKey = new Map<
-    string,
-    { ownerAId: string; ownerBId: string; games: OwnerWeeklyPerformance[] }
-  >();
-
-  for (const performance of performances) {
-    if (!performance.ownerId || !performance.opponentOwnerId) continue;
-    if (performance.opponentScore === null) continue;
-
-    const [ownerAId, ownerBId] =
-      performance.ownerId < performance.opponentOwnerId
-        ? [performance.ownerId, performance.opponentOwnerId]
-        : [performance.opponentOwnerId, performance.ownerId];
-
-    // Only accumulate from the perspective where performance.ownerId === ownerAId,
-    // so each real meeting is counted exactly once.
-    if (performance.ownerId !== ownerAId) continue;
-
-    const key = `${ownerAId}:${ownerBId}`;
-    const existing = meetingsByPairKey.get(key) ?? { ownerAId, ownerBId, games: [] };
-    existing.games.push(performance);
-    meetingsByPairKey.set(key, existing);
+async function getSeasonSettingsBySeason(): Promise<{
+  playoffWeekStartBySeason: Map<number, number>;
+  playoffTeamsBySeason: Map<number, number>;
+}> {
+  const fullChain = await getLeagueSeasonChain(getSleeperLeagueId());
+  const playoffWeekStartBySeason = new Map<number, number>();
+  const playoffTeamsBySeason = new Map<number, number>();
+  for (const league of fullChain) {
+    const season = Number(league.season);
+    playoffWeekStartBySeason.set(season, Number(league.settings.playoff_week_start ?? 15));
+    playoffTeamsBySeason.set(season, Number(league.settings.playoff_teams ?? 6));
   }
-
-  const results: HeadToHead[] = [];
-
-  for (const { ownerAId, ownerBId, games } of meetingsByPairKey.values()) {
-    const sorted = [...games].sort((a, b) => a.season - b.season || a.week - b.week);
-
-    let ownerAWins = 0;
-    let ownerBWins = 0;
-    let ties = 0;
-    let regularAWins = 0,
-      regularBWins = 0,
-      regularTies = 0;
-    let playoffAWins = 0,
-      playoffBWins = 0,
-      playoffTies = 0;
-    let marginSum = 0;
-    let biggestWin: HeadToHead["biggestWin"] = null;
-    let biggestLoss: HeadToHead["biggestLoss"] = null;
-    let highestCombined: HeadToHead["highestCombinedScore"] = null;
-    let careerPointsFor = 0;
-    let careerPointsAgainst = 0;
-
-    // Games flagged resultManuallyCorrected (see historicalResultCorrections.ts)
-    // have a real, honest win/loss outcome but NOT a real corresponding
-    // score — the winner is confirmed, no corrected score was ever
-    // fabricated to match. Every margin-derived figure below (average
-    // margin, biggest win/loss) has to skip those rows, or a "win" that
-    // still shows the opponent's real, higher score turns into a
-    // nonsensical negative "blowout." Win/loss counts and points for/
-    // against are unaffected — those are correct either way.
-    let marginSampleCount = 0;
-
-    for (const game of sorted) {
-      const margin = game.teamScore - game.opponentScore!;
-      careerPointsFor += game.teamScore;
-      careerPointsAgainst += game.opponentScore!;
-
-      const isPlayoff =
-        game.week >= (playoffWeekStartBySeason.get(game.season) ?? Infinity);
-
-      if (game.result === "win") {
-        ownerAWins++;
-        if (isPlayoff) playoffAWins++;
-        else regularAWins++;
-        if (!game.resultManuallyCorrected) {
-          marginSum += margin;
-          marginSampleCount++;
-          if (!biggestWin || margin > biggestWin.margin) {
-            biggestWin = { season: game.season, week: game.week, margin };
-          }
-        }
-      } else if (game.result === "loss") {
-        ownerBWins++;
-        if (isPlayoff) playoffBWins++;
-        else regularBWins++;
-        if (!game.resultManuallyCorrected) {
-          marginSum += margin;
-          marginSampleCount++;
-          if (!biggestLoss || margin < biggestLoss.margin) {
-            biggestLoss = { season: game.season, week: game.week, margin };
-          }
-        }
-      } else {
-        ties++;
-        if (isPlayoff) playoffTies++;
-        else regularTies++;
-        marginSum += margin; // always 0 for a tie — harmless either way
-        marginSampleCount++;
-      }
-
-      const combined = game.teamScore + game.opponentScore!;
-      if (!highestCombined || combined > highestCombined.total) {
-        highestCombined = { season: game.season, week: game.week, total: combined };
-      }
-    }
-
-    const last10 = sorted.slice(-10).reverse().map((game) => ({
-      season: game.season,
-      week: game.week,
-      ownerAScore: game.teamScore,
-      ownerBScore: game.opponentScore!,
-      winner: (game.result === "win" ? "A" : game.result === "loss" ? "B" : "tie") as
-        | "A"
-        | "B"
-        | "tie",
-    }));
-
-    let currentStreak: HeadToHead["currentStreak"] = null;
-    for (const meeting of last10) {
-      if (!currentStreak) {
-        currentStreak = { owner: meeting.winner, length: 1 };
-      } else if (currentStreak.owner === meeting.winner) {
-        currentStreak.length++;
-      } else {
-        break;
-      }
-    }
-
-    results.push({
-      ownerAId,
-      ownerAName: sorted[0]?.ownerName ?? null,
-      ownerBId,
-      ownerBName: sorted[0]?.opponentOwnerName ?? null,
-      ownerAWins,
-      ownerBWins,
-      ties,
-      regularSeason: { ownerAWins: regularAWins, ownerBWins: regularBWins, ties: regularTies },
-      playoffs: { ownerAWins: playoffAWins, ownerBWins: playoffBWins, ties: playoffTies },
-      averageMargin: marginSampleCount > 0 ? marginSum / marginSampleCount : 0,
-      biggestWin,
-      biggestLoss,
-      highestCombinedScore: highestCombined,
-      last10Meetings: last10,
-      currentStreak,
-      ownerACareerPointsFor: careerPointsFor,
-      ownerACareerPointsAgainst: careerPointsAgainst,
-    });
-  }
-
-  return results;
+  return { playoffWeekStartBySeason, playoffTeamsBySeason };
 }
 
 export type SeasonChampionship = {
@@ -277,7 +110,8 @@ export type SeasonShame = {
 
 export function computeWallOfShame(
   performances: OwnerWeeklyPerformance[],
-  standings: OwnerSeasonStanding[]
+  standings: OwnerSeasonStanding[],
+  playoffWeekStartBySeason: Map<number, number>
 ): SeasonShame[] {
   const seasons = [...new Set(standings.map((s) => s.season))].sort();
 
@@ -293,7 +127,13 @@ export function computeWallOfShame(
     );
 
     const seasonPerformances = performances.filter((p) => p.season === season);
-    const lowestWeek = seasonPerformances.reduce<OwnerWeeklyPerformance | null>(
+    // Regular season only — an eliminated team resting players (or a
+    // depleted bye-week roster) during a meaningless playoff week would
+    // otherwise produce a "lowest score" that's about roster management
+    // in a dead game, not genuine season-long futility.
+    const playoffWeekStart = playoffWeekStartBySeason.get(season) ?? Infinity;
+    const regularSeasonPerformances = seasonPerformances.filter((p) => p.week < playoffWeekStart);
+    const lowestWeek = regularSeasonPerformances.reduce<OwnerWeeklyPerformance | null>(
       (lowest, p) => (!lowest || p.teamScore < lowest.teamScore ? p : lowest),
       null
     );
@@ -343,7 +183,7 @@ export type LeagueRecords = {
   lowestSeasonScore: { ownerId: string; ownerName: string | null; season: number; points: number } | null;
   mostChampionships: { ownerId: string; ownerName: string | null; count: number } | null;
   mostFinalsAppearances: { ownerId: string; ownerName: string | null; count: number } | null;
-  mostThirdPlaceFinishes: { ownerId: string; ownerName: string | null; count: number } | null;
+  mostPlayoffAppearances: { ownerId: string; ownerName: string | null; count: number } | null;
   largestBlowout: { season: number; week: number; winnerOwnerName: string | null; margin: number } | null;
   closestVictory: { season: number; week: number; winnerOwnerName: string | null; margin: number } | null;
   mostTrades: OwnerTransactionStats | null;
@@ -356,13 +196,21 @@ export function computeLeagueRecords(
   performances: OwnerWeeklyPerformance[],
   playoffResults: OwnerPlayoffResult[],
   transactionStats: Map<string, OwnerTransactionStats>,
-  auctionPurchases: AuctionPurchase[]
+  auctionPurchases: AuctionPurchase[],
+  playoffWeekStartBySeason: Map<number, number>,
+  playoffTeamsBySeason: Map<number, number>
 ): LeagueRecords {
   const highestWeek = performances.reduce<OwnerWeeklyPerformance | null>(
     (highest, p) => (!highest || p.teamScore > highest.teamScore ? p : highest),
     null
   );
-  const lowestWeek = performances.reduce<OwnerWeeklyPerformance | null>(
+  // Regular season only — see the identical reasoning in computeWallOfShame:
+  // a resting/depleted roster in a meaningless playoff week shouldn't be
+  // able to set the league's all-time "lowest score" record.
+  const regularSeasonPerformances = performances.filter(
+    (p) => p.week < (playoffWeekStartBySeason.get(p.season) ?? Infinity)
+  );
+  const lowestWeek = regularSeasonPerformances.reduce<OwnerWeeklyPerformance | null>(
     (lowest, p) => (!lowest || p.teamScore < lowest.teamScore ? p : lowest),
     null
   );
@@ -408,8 +256,35 @@ export function computeLeagueRecords(
     );
   }
 
-  // Excludes resultManuallyCorrected rows — see the doc comment in
-  // computeHeadToHead for why a corrected win's margin can't be trusted.
+  // "Made the playoffs" that season, not any specific finish — place is
+  // an absolute 1..10 league placement (see PlayoffResult's doc comment),
+  // and only the top playoffTeams of those actually qualified for the
+  // winners bracket rather than starting straight in the consolation one.
+  function topPlayoffAppearanceCounter() {
+    const counts = new Map<string, { ownerId: string; ownerName: string | null; count: number }>();
+    for (const result of playoffResults) {
+      if (!result.ownerId) continue;
+      const playoffTeams = playoffTeamsBySeason.get(result.season) ?? 6;
+      if (result.place > playoffTeams) continue;
+      const existing = counts.get(result.ownerId) ?? {
+        ownerId: result.ownerId,
+        ownerName: result.ownerName,
+        count: 0,
+      };
+      existing.count += 1;
+      counts.set(result.ownerId, existing);
+    }
+    return [...counts.values()].reduce<{ ownerId: string; ownerName: string | null; count: number } | null>(
+      (best, c) => (!best || c.count > best.count ? c : best),
+      null
+    );
+  }
+
+  // Excludes resultManuallyCorrected rows — a corrected win/loss has a
+  // real, honest outcome but no real corresponding score (see
+  // historicalResultCorrections.ts), so a "win" that still shows the
+  // opponent's real, higher score would otherwise turn into a nonsensical
+  // negative "blowout."
   const winningResults = performances.filter(
     (p) => p.result === "win" && p.opponentScore !== null && !p.resultManuallyCorrected
   );
@@ -469,7 +344,7 @@ export function computeLeagueRecords(
     lowestSeasonScore: lowestSeason,
     mostChampionships: topPlacementCounter((place) => place === 1),
     mostFinalsAppearances: topPlacementCounter((place) => place === 1 || place === 2),
-    mostThirdPlaceFinishes: topPlacementCounter((place) => place === 3),
+    mostPlayoffAppearances: topPlayoffAppearanceCounter(),
     largestBlowout: largestBlowout
       ? {
           season: largestBlowout.season,
@@ -494,7 +369,6 @@ export function computeLeagueRecords(
 }
 
 export type LeagueHistory = {
-  headToHead: HeadToHead[];
   wallOfChampions: SeasonChampionship[];
   wallOfShame: SeasonShame[];
   records: LeagueRecords;
@@ -508,25 +382,30 @@ export type LeagueHistory = {
  * session.
  */
 export async function getLeagueHistory(): Promise<LeagueHistory> {
-  const [performances, playoffResults, transactionHistory, playoffWeekStartBySeason] =
+  const [performances, playoffResults, transactionHistory, seasonSettings] =
     await Promise.all([
       getAllWeeklyPerformances(),
       getAllPlayoffResults(),
       getTransactionHistory(),
-      getPlayoffWeekStartBySeason(),
+      getSeasonSettingsBySeason(),
     ]);
 
   const standings = await getSeasonStandings(performances);
 
   return {
-    headToHead: computeHeadToHead(performances, playoffWeekStartBySeason),
     wallOfChampions: computeWallOfChampions(playoffResults, standings),
-    wallOfShame: computeWallOfShame(performances, standings),
+    wallOfShame: computeWallOfShame(
+      performances,
+      standings,
+      seasonSettings.playoffWeekStartBySeason
+    ),
     records: computeLeagueRecords(
       performances,
       playoffResults,
       transactionHistory.statsByOwnerId,
-      transactionHistory.auctionPurchases
+      transactionHistory.auctionPurchases,
+      seasonSettings.playoffWeekStartBySeason,
+      seasonSettings.playoffTeamsBySeason
     ),
   };
 }

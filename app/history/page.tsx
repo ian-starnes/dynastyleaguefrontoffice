@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { WallOfChampionsTable } from "@/components/history/WallOfChampionsTable";
 import { WallOfShameTable } from "@/components/history/WallOfShameTable";
-import { HeadToHeadTable } from "@/components/history/HeadToHeadTable";
 import { LeagueRecordsGrid } from "@/components/history/LeagueRecordsGrid";
 import { getLeagueHistory } from "@/lib/services/leagueHistoryService";
 import { getManagerProfiles } from "@/lib/services/managerProfileService";
@@ -30,11 +29,6 @@ export default async function HistoryPage() {
 
     const managers = [...managerProfiles.values()].sort(
       (a, b) => (a.teamName ?? a.displayName).localeCompare(b.teamName ?? b.displayName)
-    );
-
-    const sortedHeadToHead = [...history.headToHead].sort(
-      (a, b) =>
-        b.ownerAWins + b.ownerBWins + b.ties - (a.ownerAWins + a.ownerBWins + a.ties)
     );
 
     return (
@@ -190,11 +184,6 @@ export default async function HistoryPage() {
         <div className="mt-4">
           <LeagueRecordsGrid records={history.records} />
         </div>
-
-        <h2 className="mt-10 font-serif text-xl text-primary">All-Time Head-to-Head</h2>
-        <Card className="mt-4">
-          <HeadToHeadTable pairs={sortedHeadToHead} />
-        </Card>
       </div>
     );
   } catch (error) {
