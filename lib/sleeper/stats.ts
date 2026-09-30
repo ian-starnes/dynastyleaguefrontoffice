@@ -43,7 +43,7 @@ export async function getWeeklyStats(
 ): Promise<SleeperWeeklyStatsMap> {
   return sleeperFetch<SleeperWeeklyStatsMap>(
     `/stats/nfl/${seasonType}/${season}/${week}`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 300 } }
   );
 }
 
@@ -82,7 +82,7 @@ export async function getSeasonProjections(
 ): Promise<SleeperSeasonProjectionsMap> {
   return sleeperFetch<SleeperSeasonProjectionsMap>(
     `/projections/nfl/${seasonType}/${season}`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 300 } }
   );
 }
 
@@ -96,6 +96,6 @@ export type SleeperNflState = {
 /** Sleeper's own notion of "what week/season is it right now" — the source of truth for whether the current season has any real games yet. */
 export async function getNflState(): Promise<SleeperNflState> {
   return sleeperFetch<SleeperNflState>("/state/nfl", {
-    next: { revalidate: 3600 },
+    next: { revalidate: 300 },
   });
 }
