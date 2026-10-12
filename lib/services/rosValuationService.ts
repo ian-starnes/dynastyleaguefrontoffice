@@ -1,10 +1,10 @@
 import { getPlayers, type NFLPlayer } from "@/lib/sleeper";
 import { getROSStats, type ROSStats } from "./rosStatsService";
-import { getReplacementLevels, type ReplacementLevel } from "./replacementLevelService";
 import { getROSConsensusValues, normalizeConsensusRank, type ROSConsensusPlayer } from "./rosConsensusService";
 import { normalizePlayerName } from "./fantasycalc";
 import {
   ROS_VALUATION_WEIGHTS,
+  ROSTER_REQUIREMENTS,
   AUCTION_ECONOMY,
   ROSTERABLE_POOL_MULTIPLIER,
 } from "@/lib/config/rosValuationConfig";
@@ -13,7 +13,18 @@ export type ROSValuation = {
   playerId: string;
   /** Blended rest-of-season PPG projection (Components A+B+C, renormalized for missing C) — NOT season-long PPG, NOT a raw stat. */
   rosProjection: number;
-  /** Position-specific replacement-level ROS PPG (brief section 4). */
+  /**
+   * Position-specific replacement-level ROS PPG (brief section 4) — the
+   * BLENDED rosProjection (same Components A+B+C basis as every player's
+   * own rosProjection above, not raw weightedPPG) of whoever sits exactly
+   * at that position's real starting-lineup-demand rank. Computed on the
+   * same scale as rosProjection deliberately: a threshold measured on a
+   * different basis than the value it's subtracted from (a confirmed real
+   * bug — a raw-PPG-ranked replacement level could sit above a player's
+   * blended projection even when that same player ranked well inside the
+   * replacement cutoff by blended merit, incorrectly flooring their
+   * marginal value to zero) would make marginalValue incoherent.
+   */
   replacementValue: number;
   /** rosProjection minus replacementValue, floored at 0 — production above replacement. */
   marginalValue: number;
@@ -27,7 +38,6 @@ export type ROSValuation = {
 
 export type ROSValuationContext = {
   rosStats: Map<string, ROSStats>;
-  replacementLevels: Map<string, ReplacementLevel>;
   consensusValues: Map<string, ROSConsensusPlayer>;
   players: NFLPlayer[];
 };
@@ -40,11 +50,28 @@ function isFantasyPosition(position: string): position is FantasyPosition {
 }
 
 /**
+ * How many players at a position have real starting-lineup demand, given
+ * ROSTER_REQUIREMENTS — not just "top N by some arbitrary cutoff." FLEX
+ * slots are split across RB/WR/TE per the configured allocation (not a
+ * measured fact, a documented estimate — see
+ * lib/config/rosValuationConfig.ts).
+ */
+function replacementRankForPosition(position: FantasyPosition): number {
+  const { numTeams, starters, flexAllocation } = ROSTER_REQUIREMENTS;
+  const flexShare = position === "QB" ? 0 : flexAllocation[position];
+  const dedicatedStarters = starters[position];
+  return Math.round(numTeams * (dedicatedStarters + flexShare * starters.FLEX));
+}
+
+/**
  * Assembles everything calculateROSAuctionValue needs, once — every
  * component here is a real live data fetch (rosStatsService's Sleeper
- * stats, replacementLevelService's derived thresholds, rosConsensus's
- * stub). Expensive, so callers computing many players' values should
- * build this once and reuse it, not call it per player.
+ * stats, rosConsensus's stub). Expensive, so callers computing many
+ * players' values should build this once and reuse it, not call it per
+ * player. Replacement level is NOT precomputed here — it depends on every
+ * player's blended rosProjection, which only exists once
+ * calculateAllROSAuctionValues actually runs the blend, so it's derived
+ * inline there instead (see that function's doc comment).
  */
 export async function buildROSValuationContext(
   precomputedPlayers?: NFLPlayer[]
@@ -54,8 +81,7 @@ export async function buildROSValuationContext(
     getROSStats(players),
     getROSConsensusValues(),
   ]);
-  const replacementLevels = await getReplacementLevels({ rosStats, players });
-  return { rosStats, replacementLevels, consensusValues, players };
+  return { rosStats, consensusValues, players };
 }
 
 /**
@@ -267,12 +293,26 @@ function blendProjection(
  * figure once scaled against the total real $2,000 league economy and
  * every other player's marginal value. A single player's auction value
  * cannot be computed in isolation from the rest of the pool.
+ *
+ * Also why replacement level is derived HERE rather than fetched as a
+ * precomputed input: it's the blended rosProjection (Components A+B+C)
+ * of whoever sits at each position's replacement rank, and that blend
+ * only exists once every player's z-scores are computed below. An
+ * earlier version ranked the replacement player by raw weightedPPG alone
+ * (Component A only) and then subtracted THAT raw figure from every
+ * player's full blended rosProjection — a real, confirmed bug: a
+ * player can rank highly by blended merit (strong opportunity + expert
+ * consensus) while a small-sample raw-PPG outlier elsewhere at the same
+ * position set a higher raw threshold, incorrectly flooring the first
+ * player's marginal value to zero even though they clearly belonged
+ * above replacement. Comparing rosProjection against a threshold
+ * computed on the exact same basis fixes that.
  */
 export async function calculateAllROSAuctionValues(
   context?: ROSValuationContext
 ): Promise<Map<string, ROSValuation>> {
   const ctx = context ?? (await buildROSValuationContext());
-  const { rosStats, replacementLevels, consensusValues, players } = ctx;
+  const { rosStats, consensusValues, players } = ctx;
 
   const ppgDistByPosition = new Map<FantasyPosition, PositionDistribution>();
   const opportunityDistByPosition = new Map<FantasyPosition, PositionDistribution>();
@@ -296,23 +336,21 @@ export async function calculateAllROSAuctionValues(
     consensusPoolSizeByPosition.set(position, (consensusPoolSizeByPosition.get(position) ?? 0) + 1);
   }
 
-  type PreDollar = {
+  type PreReplacement = {
     player: NFLPlayer;
     rosProjection: number;
-    replacementValue: number;
-    marginalValue: number;
     consensusScore: number | null;
     opportunityScore: number | null;
   };
-  const preDollarByPosition = new Map<FantasyPosition, PreDollar[]>();
 
+  // Pass 1: every eligible player's blended projection — marginal value
+  // isn't computable yet, since replacement level (below) depends on
+  // every player at a position already having one of these.
+  const preReplacementByPosition = new Map<FantasyPosition, PreReplacement[]>();
   for (const player of players) {
     if (!isFantasyPosition(player.position)) continue;
     const stats = rosStats.get(player.id);
     if (!stats || stats.gamesPlayed === 0) continue;
-
-    const replacementLevel = replacementLevels.get(player.position);
-    if (!replacementLevel) continue;
 
     const opportunityScore = computeOpportunityScore(player.position, stats);
 
@@ -337,18 +375,40 @@ export async function calculateAllROSAuctionValues(
       opportunityDistByPosition.get(player.position)!
     );
 
-    const marginalValue = Math.max(0, rosProjection - replacementLevel.replacementPPG);
+    const list = preReplacementByPosition.get(player.position) ?? [];
+    list.push({ player, rosProjection, consensusScore, opportunityScore });
+    preReplacementByPosition.set(player.position, list);
+  }
 
-    const list = preDollarByPosition.get(player.position) ?? [];
-    list.push({
-      player,
-      rosProjection,
-      replacementValue: replacementLevel.replacementPPG,
-      marginalValue,
-      consensusScore,
-      opportunityScore,
-    });
-    preDollarByPosition.set(player.position, list);
+  // Replacement level per position: the blended rosProjection of whoever
+  // sits exactly at that position's real starting-lineup-demand rank —
+  // see this function's doc comment for why this has to be the same
+  // blended basis every player's own rosProjection is on, not a
+  // separately-ranked raw PPG figure.
+  const replacementValueByPosition = new Map<FantasyPosition, number>();
+  for (const position of FANTASY_POSITIONS) {
+    const list = (preReplacementByPosition.get(position) ?? []).sort(
+      (a, b) => b.rosProjection - a.rosProjection
+    );
+    const rank = replacementRankForPosition(position);
+    // Clamp to the actual pool size — a shallow position pool (e.g. very
+    // early season) shouldn't index past what real data exists for.
+    const index = Math.min(rank, list.length) - 1;
+    replacementValueByPosition.set(position, list[Math.max(0, index)]?.rosProjection ?? 0);
+  }
+
+  // Pass 2: marginal value, now that each position's replacement level
+  // is known.
+  type PreDollar = PreReplacement & { replacementValue: number; marginalValue: number };
+  const preDollarByPosition = new Map<FantasyPosition, PreDollar[]>();
+  for (const position of FANTASY_POSITIONS) {
+    const replacementValue = replacementValueByPosition.get(position) ?? 0;
+    const list = (preReplacementByPosition.get(position) ?? []).map((p) => ({
+      ...p,
+      replacementValue,
+      marginalValue: Math.max(0, p.rosProjection - replacementValue),
+    }));
+    preDollarByPosition.set(position, list);
   }
 
   // Only the top players PER POSITION (by marginal value, up to
@@ -364,10 +424,7 @@ export async function calculateAllROSAuctionValues(
     const list = (preDollarByPosition.get(position) ?? []).sort(
       (a, b) => b.marginalValue - a.marginalValue
     );
-    const replacementLevel = replacementLevels.get(position);
-    const cutoff = replacementLevel
-      ? replacementLevel.replacementRank * ROSTERABLE_POOL_MULTIPLIER
-      : list.length;
+    const cutoff = replacementRankForPosition(position) * ROSTERABLE_POOL_MULTIPLIER;
     rosterablePool.push(...list.slice(0, cutoff));
     outsidePool.push(...list.slice(cutoff));
   }

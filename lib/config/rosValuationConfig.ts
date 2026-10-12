@@ -17,9 +17,21 @@ export type RosterRequirements = {
   };
   /**
    * How FLEX starter slots get allocated across RB/WR/TE for
-   * replacement-level purposes — must sum to 1. Not a measured fact,
-   * a reasonable estimate of typical flex-start behavior; adjust here,
-   * not in the calculation code, if real league behavior differs.
+   * replacement-level purposes — must sum to 1. MEASURED from this
+   * league's own real starting lineups (weeklyPerformanceService's
+   * starterPlayerIds), not a guess: across every team-week where a team
+   * started a complete, standard 8-man lineup (any RB/WR beyond the 2
+   * dedicated slots, plus every TE started — TE has 0 dedicated slots —
+   * must occupy a FLEX spot), 403 real team-weeks qualified, and the
+   * resulting split (RB ~0.27, WR ~0.52, TE ~0.21) held stable
+   * independently within every one of 2022-2026 (TE's share never left
+   * 0.18-0.28 in any single season). Replaces an earlier guessed
+   * {RB:0.45, WR:0.45, TE:0.1} split that was never checked against real
+   * behavior — confirmed live that it roughly halved TE's true flex
+   * share, which was the direct cause of a real bug: a clearly elite,
+   * high-usage TE (Trey McBride, 2026) landing at the $1 floor because
+   * the model's replacement rank for TE was shallower than how real
+   * managers in this league actually use their FLEX spots.
    */
   flexAllocation: {
     RB: number;
@@ -32,15 +44,16 @@ export type RosterRequirements = {
  * Confirmed live against the real league (GET /league/{id}), not
  * assumed: roster_positions is exactly
  * ["QB","RB","RB","WR","WR","FLEX","FLEX","FLEX","BN"x7] — there is NO
- * dedicated TE starter slot. TE only plays through the 3 FLEX spots
- * alongside RB/WR, which is why TE's dedicated starters value below is
- * 0, not 1 — an earlier version of this config assumed a dedicated TE
- * slot that this league's real settings don't have.
+ * dedicated TE starter slot, confirmed unchanged across every season
+ * 2020-2026. TE only plays through the 3 FLEX spots alongside RB/WR,
+ * which is why TE's dedicated starters value below is 0, not 1 — an
+ * earlier version of this config assumed a dedicated TE slot that this
+ * league's real settings don't have.
  */
 export const ROSTER_REQUIREMENTS: RosterRequirements = {
   numTeams: 10,
   starters: { QB: 1, RB: 2, WR: 2, TE: 0, FLEX: 3 },
-  flexAllocation: { RB: 0.45, WR: 0.45, TE: 0.1 },
+  flexAllocation: { RB: 0.27, WR: 0.52, TE: 0.21 },
 };
 
 /**
