@@ -18,9 +18,9 @@ export default async function TeamsPage() {
           {valuations.map((team) => (
             <Link key={team.ownerId} href={`/teams/${team.ownerId}`}>
               <Card className="p-5 transition hover:border-gold/40">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">{team.ownerName}</p>
-                  <span className="text-xs text-ink/40">#{team.rank}</span>
+                <div className="flex min-w-0 items-center justify-between gap-2">
+                  <p className="truncate font-medium text-ink">{team.ownerName}</p>
+                  <span className="shrink-0 text-xs text-ink/40">#{team.rank}</span>
                 </div>
                 <p className="mt-2 font-serif text-2xl text-gold">
                   {formatDollarValue(team.franchiseValue)}

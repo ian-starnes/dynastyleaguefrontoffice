@@ -123,7 +123,7 @@ export class FranchiseValueService {
 
   /**
    * Builds on getFranchiseValuations() with the league-wide superlative
-   * stats the Front Office dashboard needs. These scope to currently
+   * stats the League page needs. These scope to currently
    * ROSTERED players only — a free agent's placeholder contract isn't a
    * real "contract" to compare against.
    */

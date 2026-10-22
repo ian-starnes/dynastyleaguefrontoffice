@@ -50,7 +50,7 @@ export default async function ManagersPage() {
                   ) : null}
                 </div>
                 {hasContact ? (
-                  <ul className="mt-3 space-y-1 text-sm text-ink/70">
+                  <ul className="mt-3 space-y-1 break-words text-sm text-ink/70">
                     {manager.contact.email ? <li>{manager.contact.email}</li> : null}
                     {manager.contact.phone ? <li>{manager.contact.phone}</li> : null}
                     {manager.contact.discord ? (

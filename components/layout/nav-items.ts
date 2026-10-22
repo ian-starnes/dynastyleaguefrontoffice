@@ -1,5 +1,4 @@
 import {
-  Landmark,
   Trophy,
   Users,
   BookUser,
@@ -18,10 +17,10 @@ export type NavItem = {
 };
 
 // Single source of truth for the left navigation. Add a route here and it
-// appears in the sidebar automatically.
+// appears in the sidebar automatically. League is the landing page ("/")
+// — a public, league-wide view, not a per-person dashboard.
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Front Office", href: "/", icon: Landmark },
-  { label: "League", href: "/league", icon: Trophy },
+  { label: "League", href: "/", icon: Trophy },
   { label: "Teams", href: "/teams", icon: Users },
   { label: "Managers", href: "/managers", icon: BookUser },
   { label: "Assets", href: "/assets", icon: Wallet },

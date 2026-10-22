@@ -12,7 +12,7 @@ export type RecentMovement = {
   summary: string;
 };
 
-export type FrontOfficeSummary = {
+export type TeamSummary = {
   ownerId: string;
   ownerName: string | null;
   /** The real current season this whole summary — Market Value above all — is computed for, e.g. 2026. Never hardcoded; always this season's real value, so it never goes stale. */
@@ -23,7 +23,7 @@ export type FrontOfficeSummary = {
   currentSeasonRank: number | null;
   rosterMarketValue: number;
   futurePickValue: number;
-  /** The brief asks for the next 3 years specifically (e.g. 2027/2028/2029 from a 2026 current season). */
+  /** The next 3 years specifically (e.g. 2027/2028/2029 from a 2026 current season). */
   projectedAuctionBudgetBySeason: { season: number; value: number }[];
   totalKeeperSurplus: number;
   expiringContracts: LeaguePlayer[];
@@ -33,14 +33,14 @@ export type FrontOfficeSummary = {
 };
 
 /**
- * Everything DLFO's Front Office landing page needs for "my" franchise —
- * composes the engines built in Phases 6/7 rather than computing
- * anything new. No championship odds, no NFL schedule/next-game info,
- * per the brief's explicit exclusions for this page.
+ * Everything a single franchise's dashboard needs — composes the
+ * franchise-value, future-picks, and transaction-history engines rather
+ * than computing anything new. Used by the Teams detail page for any
+ * owner, not just one person's own team.
  */
-export async function getFrontOfficeSummary(
+export async function getTeamSummary(
   ownerId: string
-): Promise<FrontOfficeSummary | null> {
+): Promise<TeamSummary | null> {
   const [league, players, valuations, projectedBudgets, performances, currentTransactions, owners, rosters] =
     await Promise.all([
       getLeague(),
@@ -49,7 +49,7 @@ export async function getFrontOfficeSummary(
       getProjectedAuctionBudgets(),
       getAllWeeklyPerformances(),
       getAllTransactions().catch((error: unknown) => {
-        console.error("Current-season transactions fetch failed for Front Office:", error);
+        console.error("Current-season transactions fetch failed for team summary:", error);
         return [];
       }),
       getOwners(),

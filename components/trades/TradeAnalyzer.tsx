@@ -265,7 +265,7 @@ function TradeResultCard({
  * DLFO's Trade Analyzer — pressure-tests a proposed (not executed) trade
  * two ways: the immediate real impact to each side's actual Market Value
  * and Franchise Value (franchiseImpact, using the exact same methodology
- * as the League/Front Office pages), and the longer-horizon multi-year
+ * as the League page), and the longer-horizon multi-year
  * keeper-surplus projection via lib/services/tradeCalculatorService.ts
  * (where the real "receiving-team contract reset" value shows up — a
  * same-day Asset Value comparison would always show zero difference,

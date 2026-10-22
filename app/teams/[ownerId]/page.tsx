@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { StatTile } from "@/components/ui/StatTile";
 import { PlayerHeadshot } from "@/components/assets/PlayerHeadshot";
 import { formatDollarValue } from "@/lib/format";
-import { getFrontOfficeSummary } from "@/lib/services/frontOfficeService";
+import { getTeamSummary } from "@/lib/services/teamSummaryService";
 import { getLeaguePlayers } from "@/lib/league-players";
 
 export default async function TeamDetailPage({
@@ -16,7 +16,7 @@ export default async function TeamDetailPage({
   const { ownerId } = await params;
 
   const [summary, players] = await Promise.all([
-    getFrontOfficeSummary(ownerId),
+    getTeamSummary(ownerId),
     getLeaguePlayers(),
   ]);
 

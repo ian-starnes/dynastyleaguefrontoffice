@@ -62,7 +62,7 @@ export type FranchiseValueSnapshot = {
 };
 
 export type FranchiseValueImpact = {
-  /** This owner's REAL current totals — same figures/methodology as the League and Front Office pages (lib/services/franchiseValueService.ts) — before this hypothetical trade. */
+  /** This owner's REAL current totals — same figures/methodology as the League page (lib/services/franchiseValueService.ts) — before this hypothetical trade. */
   before: FranchiseValueSnapshot;
   /** before, with this trade's assets swapped in/out. */
   after: FranchiseValueSnapshot;

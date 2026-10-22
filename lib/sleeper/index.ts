@@ -4,7 +4,7 @@ export { getPlayers, getAllPlayerNames } from "./players";
 export { getRosters, getRostersForLeague } from "./rosters";
 export { getOwners, getOwnersForLeague } from "./owners";
 export { resolveSleeperAvatarUrl } from "./avatar";
-export { getMyOwnerId, getSleeperLeagueId } from "./config";
+export { getSleeperLeagueId } from "./config";
 export {
   getTransactions,
   getAllTransactions,
