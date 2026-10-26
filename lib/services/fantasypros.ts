@@ -35,7 +35,7 @@ async function fetchFantasyProsDynastyRankings(): Promise<FantasyProsRankingsRes
   const url = `${FANTASYPROS_API_BASE_URL}/${DYNASTY_RANKINGS_SEASON}/consensus-rankings?type=DYNASTY&position=ALL&scoring=HALF`;
   const response = await fetch(url, {
     headers: { "x-api-key": apiKey },
-    next: { revalidate: 3600 },
+    next: { revalidate: 300 },
   });
 
   if (!response.ok) {

@@ -51,9 +51,10 @@ export type LeaguePlayer = {
   marketValue: number | null;
 
   /**
-   * Real Expert Consensus Ranking from FantasyPros; always null today — no
-   * licensed API key exists yet. See lib/services/fantasypros.ts for why,
-   * and what's needed to turn this on. Not displayed until it's real.
+   * Real dynasty Expert Consensus Ranking from FantasyPros (lib/services/
+   * fantasypros.ts) — null only when a specific player has no match in
+   * their rankings (e.g. a practice-squad/undrafted player), or if the
+   * API key/request fails, never fabricated.
    */
   fantasyProsECR: number | null;
 

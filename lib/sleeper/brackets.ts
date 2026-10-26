@@ -7,7 +7,7 @@ export async function getWinnersBracketForLeague(
 ): Promise<SleeperBracketMatch[]> {
   return sleeperFetch<SleeperBracketMatch[]>(
     `/league/${leagueId}/winners_bracket`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 300 } }
   );
 }
 
@@ -21,7 +21,7 @@ export async function getLosersBracketForLeague(
 ): Promise<SleeperBracketMatch[]> {
   return sleeperFetch<SleeperBracketMatch[]>(
     `/league/${leagueId}/losers_bracket`,
-    { next: { revalidate: 3600 } }
+    { next: { revalidate: 300 } }
   );
 }
 

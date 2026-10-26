@@ -114,7 +114,7 @@ async function fetchFantasyProsRankings(
   const url = `${FANTASYPROS_API_BASE_URL}/${season}/consensus-rankings?type=${type}&position=ALL&scoring=HALF`;
   const response = await fetch(url, {
     headers: { "x-api-key": apiKey },
-    next: { revalidate: 3600 },
+    next: { revalidate: 300 },
   });
 
   if (!response.ok) {
